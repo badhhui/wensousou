@@ -277,7 +277,7 @@ void MainWindow::setupUi() {
   resultFont.setPointSize(resultFont.pointSize() + 1);
   resultsTable_->setFont(resultFont);
   resultsTable_->setHorizontalHeaderLabels(
-      {QStringLiteral("文件名"), QStringLiteral("大小"), QStringLiteral("命中内容"),
+      {QStringLiteral("文件名"), QStringLiteral("文件大小"), QStringLiteral("命中内容"),
        QStringLiteral("修改时间"), QStringLiteral("操作")});
   resultsTable_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
   resultsTable_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
@@ -285,7 +285,7 @@ void MainWindow::setupUi() {
   resultsTable_->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Fixed);
   resultsTable_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Fixed);
   resultsTable_->setColumnWidth(0, 390);
-  resultsTable_->setColumnWidth(1, 100);
+  resultsTable_->setColumnWidth(1, 120);
   resultsTable_->setColumnWidth(3, 175);
   resultsTable_->setColumnWidth(4, 130);
   resultsTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -561,7 +561,7 @@ void MainWindow::renderCurrentPage() {
   resultsTable_->setRowCount(count);
   for (int row = 0; row < count; ++row) {
     const SearchResult& result = filteredSearchResults_.at(first + row);
-    auto* filename = new QTableWidgetItem(result.filename);
+    auto* filename = new QTableWidgetItem;
     filename->setData(Qt::UserRole, result.id);
     filename->setData(Qt::UserRole + 1, result.path);
     filename->setToolTip(result.path);
