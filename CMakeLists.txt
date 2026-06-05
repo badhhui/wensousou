@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(wensousou VERSION 1.0.18 LANGUAGES C CXX)
+project(wensousou VERSION 1.0.19 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

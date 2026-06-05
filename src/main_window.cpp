@@ -65,8 +65,8 @@ QString highlightedHtml(QString text, const QString& startMarker,
                         const QString& endMarker) {
   text = text.toHtmlEscaped();
   text.replace(startMarker,
-               QStringLiteral("<span style=\"background-color:#fff19a;"
-                              "color:#1f2328;\">"));
+               QStringLiteral("<span style=\"background-color:#d9f99d;"
+                              "color:#1f2937;border-radius:3px;\">"));
   text.replace(endMarker, QStringLiteral("</span>"));
   return text;
 }
@@ -78,8 +78,8 @@ QString anchoredHighlightedHtml(QString text, const QString& startMarker,
   int count = 0;
   int position = 0;
   while ((position = text.indexOf(startMarker, position)) >= 0) {
-    const QString color = count == currentMatch ? QStringLiteral("#fb923c")
-                                                : QStringLiteral("#fff19a");
+    const QString color = count == currentMatch ? QStringLiteral("#fdba74")
+                                                : QStringLiteral("#d9f99d");
     const QString replacement =
         QStringLiteral("<a name=\"match-%1\"></a><span style=\""
                        "background-color:%2;color:#1f2328;\">")
@@ -158,14 +158,14 @@ void MainWindow::setupUi() {
   auto* central = new QWidget(this);
   central->setObjectName(QStringLiteral("appShell"));
   auto* layout = new QVBoxLayout(central);
-  layout->setContentsMargins(34, 29, 34, 21);
-  layout->setSpacing(21);
+  layout->setContentsMargins(32, 26, 32, 18);
+  layout->setSpacing(18);
 
   auto* toolbar = new QHBoxLayout;
-  toolbar->setSpacing(18);
+  toolbar->setSpacing(14);
   auto* brandMark = new QFrame(this);
   brandMark->setObjectName(QStringLiteral("brandMark"));
-  brandMark->setFixedSize(60, 60);
+  brandMark->setFixedSize(48, 48);
   auto* brandMarkLayout = new QVBoxLayout(brandMark);
   brandMarkLayout->setContentsMargins(0, 0, 0, 0);
   auto* brandGlyph = new QLabel(QStringLiteral("文"), brandMark);
@@ -197,18 +197,19 @@ void MainWindow::setupUi() {
   searchPanel_ = new QFrame(this);
   searchPanel_->setObjectName(QStringLiteral("searchPanel"));
   auto* controlLayout = new QVBoxLayout(searchPanel_);
-  controlLayout->setContentsMargins(18, 16, 18, 16);
-  controlLayout->setSpacing(12);
+  controlLayout->setContentsMargins(20, 18, 20, 18);
+  controlLayout->setSpacing(14);
 
   auto* directoryHeader = new QHBoxLayout;
   auto* searchTitle = new QLabel(QStringLiteral("搜索本机文档"), this);
-  searchTitle->setObjectName(QStringLiteral("resultTitle"));
+  searchTitle->setObjectName(QStringLiteral("panelTitle"));
   directoryHeader->addWidget(searchTitle);
   directoryHeader->addStretch();
 
   auto* managerButton = new QPushButton(QStringLiteral("索引管理"), this);
   auto* settingsButton = new QPushButton(QStringLiteral("设置"), this);
   for (QPushButton* button : {managerButton, settingsButton}) {
+    button->setObjectName(QStringLiteral("quietButton"));
     directoryHeader->addWidget(button);
   }
   controlLayout->addLayout(directoryHeader);
@@ -221,21 +222,28 @@ void MainWindow::setupUi() {
   searchEdit_->setObjectName(QStringLiteral("heroSearch"));
   searchButton_ = new QPushButton(QStringLiteral("搜索"), this);
   searchButton_->setObjectName(QStringLiteral("primaryButton"));
+  searchButton_->setMinimumHeight(48);
   searchRow->addWidget(searchEdit_, 1);
   searchRow->addWidget(searchButton_);
   controlLayout->addLayout(searchRow);
 
-  auto* filterRow = new QHBoxLayout;
-  filterRow->setSpacing(13);
+  auto* filterBar = new QFrame(this);
+  filterBar->setObjectName(QStringLiteral("filterBar"));
+  auto* filterRow = new QHBoxLayout(filterBar);
+  filterRow->setContentsMargins(12, 10, 12, 10);
+  filterRow->setSpacing(10);
   auto* filterLabel = new QLabel(QStringLiteral("搜索筛选"), this);
   filterLabel->setObjectName(QStringLiteral("sectionLabel"));
   filterRow->addWidget(filterLabel);
   rootFilter_ = new QComboBox(this);
+  rootFilter_->setObjectName(QStringLiteral("filterCombo"));
   extensionFilterButton_ = new QPushButton(this);
+  extensionFilterButton_->setObjectName(QStringLiteral("filterButton"));
   extensionFilterMenu_ = new QMenu(extensionFilterButton_);
   extensionFilterButton_->setMenu(extensionFilterMenu_);
   rebuildTypeFilterMenu();
   modifiedFilter_ = new QComboBox(this);
+  modifiedFilter_->setObjectName(QStringLiteral("filterCombo"));
   modifiedFilter_->addItem(QStringLiteral("全部日期"), 0);
   modifiedFilter_->addItem(QStringLiteral("最近一天"), 1);
   modifiedFilter_->addItem(QStringLiteral("最近 7 天"), 7);
@@ -245,7 +253,7 @@ void MainWindow::setupUi() {
   filterRow->addWidget(extensionFilterButton_);
   filterRow->addWidget(modifiedFilter_);
   filterRow->addStretch();
-  controlLayout->addLayout(filterRow);
+  controlLayout->addWidget(filterBar);
   layout->addWidget(searchPanel_);
 
   auto* resultHeader = new QHBoxLayout;
@@ -269,10 +277,12 @@ void MainWindow::setupUi() {
   searchProgress_->hide();
   resultHeader->addWidget(searchProgress_);
   collapseButton_ = new QPushButton(QStringLiteral("收起搜索区"), this);
+  collapseButton_->setObjectName(QStringLiteral("quietButton"));
   resultHeader->addWidget(collapseButton_);
   layout->addLayout(resultHeader);
 
   resultsTable_ = new QTableWidget(0, 5, this);
+  resultsTable_->setObjectName(QStringLiteral("resultsTable"));
   QFont resultFont = resultsTable_->font();
   resultFont.setPointSize(resultFont.pointSize() + 1);
   resultsTable_->setFont(resultFont);
@@ -284,15 +294,15 @@ void MainWindow::setupUi() {
   resultsTable_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
   resultsTable_->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Fixed);
   resultsTable_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Fixed);
-  resultsTable_->setColumnWidth(0, 390);
-  resultsTable_->setColumnWidth(1, 120);
-  resultsTable_->setColumnWidth(3, 175);
-  resultsTable_->setColumnWidth(4, 130);
+  resultsTable_->setColumnWidth(0, 380);
+  resultsTable_->setColumnWidth(1, 112);
+  resultsTable_->setColumnWidth(3, 168);
+  resultsTable_->setColumnWidth(4, 128);
   resultsTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
   resultsTable_->setSelectionMode(QAbstractItemView::SingleSelection);
   resultsTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
   resultsTable_->setAlternatingRowColors(true);
-  resultsTable_->verticalHeader()->setDefaultSectionSize(55);
+  resultsTable_->verticalHeader()->setDefaultSectionSize(58);
   resultsTable_->verticalHeader()->setVisible(false);
   layout->addWidget(resultsTable_, 1);
   auto* paging = new QHBoxLayout;
@@ -304,7 +314,9 @@ void MainWindow::setupUi() {
   }
   pageSizeCombo_->setCurrentIndex(pageSizeCombo_->findData(pageSize_));
   previousButton_ = new QPushButton(QStringLiteral("上一页"), this);
+  previousButton_->setObjectName(QStringLiteral("quietButton"));
   nextButton_ = new QPushButton(QStringLiteral("下一页"), this);
+  nextButton_->setObjectName(QStringLiteral("quietButton"));
   pageLabel_ = new QLabel(QStringLiteral("共 0 页"), this);
   auto* pageButtons = new QWidget(this);
   pageButtonsLayout_ = new QHBoxLayout(pageButtons);
@@ -575,7 +587,8 @@ void MainWindow::renderCurrentPage() {
                         QStringLiteral("【"), QStringLiteral("】")));
     highlightedFilename->setToolTip(result.path);
     highlightedFilename->setFont(resultsTable_->font());
-    highlightedFilename->setMargin(8);
+    highlightedFilename->setMargin(10);
+    highlightedFilename->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     resultsTable_->setCellWidget(row, 0, highlightedFilename);
     resultsTable_->setItem(row, 1, new QTableWidgetItem(formatFileSize(result.size)));
     auto* snippet = new QLabel(this);
@@ -583,7 +596,9 @@ void MainWindow::renderCurrentPage() {
     snippet->setText(highlightedHtml(result.snippet, QStringLiteral("【"),
                                      QStringLiteral("】")));
     snippet->setFont(resultsTable_->font());
-    snippet->setMargin(8);
+    snippet->setMargin(10);
+    snippet->setWordWrap(true);
+    snippet->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     resultsTable_->setCellWidget(row, 2, snippet);
     resultsTable_->setItem(row, 3, new QTableWidgetItem(formatTime(result.mtimeMs)));
 
@@ -653,6 +668,9 @@ void MainWindow::updatePagination() {
   const int last = qMin(pageCount, first + 5);
   for (int index = first; index < last; ++index) {
     auto* button = new QPushButton(QString::number(index + 1), this);
+    button->setObjectName(index == page_ ? QStringLiteral("activePageButton")
+                                         : QStringLiteral("quietButton"));
+    button->setFixedWidth(38);
     button->setEnabled(index != page_);
     connect(button, &QPushButton::clicked, this, [this, index]() {
       page_ = index;

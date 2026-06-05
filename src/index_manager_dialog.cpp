@@ -8,6 +8,7 @@
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFrame>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -83,9 +84,20 @@ IndexManagerDialog::IndexManagerDialog(Database* database, QWidget* parent)
   setWindowTitle(QStringLiteral("索引管理"));
   resize(1200, 720);
 
+  auto* title = new QLabel(QStringLiteral("索引管理"), this);
+  title->setObjectName(QStringLiteral("panelTitle"));
   summaryLabel_ = new QLabel(this);
-  summaryLabel_->setObjectName(QStringLiteral("resultHint"));
+  summaryLabel_->setObjectName(QStringLiteral("summaryPill"));
+
+  auto* summaryBar = new QFrame(this);
+  summaryBar->setObjectName(QStringLiteral("summaryBar"));
+  auto* summaryLayout = new QHBoxLayout(summaryBar);
+  summaryLayout->setContentsMargins(14, 12, 14, 12);
+  summaryLayout->setSpacing(10);
+  summaryLayout->addWidget(summaryLabel_, 1);
+
   rootsTable_ = new QTableWidget(0, 7, this);
+  rootsTable_->setObjectName(QStringLiteral("indexTable"));
   rootsTable_->setHorizontalHeaderLabels(
       {QStringLiteral("目录"), QStringLiteral("文件数"), QStringLiteral("失败"),
        QStringLiteral("索引大小"), QStringLiteral("更新时间"), QStringLiteral("状态"),
@@ -98,13 +110,17 @@ IndexManagerDialog::IndexManagerDialog(Database* database, QWidget* parent)
   rootsTable_->setSelectionMode(QAbstractItemView::SingleSelection);
   rootsTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
   rootsTable_->setAlternatingRowColors(true);
+  rootsTable_->verticalHeader()->setDefaultSectionSize(48);
   rootsTable_->verticalHeader()->setVisible(false);
 
   addButton_ = new QPushButton(QStringLiteral("添加目录"), this);
+  addButton_->setObjectName(QStringLiteral("primaryButton"));
   refreshButton_ = new QPushButton(QStringLiteral("刷新所选"), this);
+  refreshButton_->setObjectName(QStringLiteral("quietButton"));
   refreshAllButton_ = new QPushButton(QStringLiteral("全部更新"), this);
-  refreshAllButton_->setObjectName(QStringLiteral("primaryButton"));
+  refreshAllButton_->setObjectName(QStringLiteral("quietButton"));
   retryButton_ = new QPushButton(QStringLiteral("重试失败文件"), this);
+  retryButton_->setObjectName(QStringLiteral("quietButton"));
   removeButton_ = new QPushButton(QStringLiteral("移除所选"), this);
   removeButton_->setObjectName(QStringLiteral("dangerButton"));
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
@@ -116,14 +132,20 @@ IndexManagerDialog::IndexManagerDialog(Database* database, QWidget* parent)
   connect(retryButton_, &QPushButton::clicked, this, &IndexManagerDialog::retryFailuresRequested);
 
   auto* toolbar = new QHBoxLayout;
+  toolbar->setSpacing(8);
   toolbar->addWidget(addButton_);
+  toolbar->addSpacing(12);
   toolbar->addWidget(refreshButton_);
   toolbar->addWidget(refreshAllButton_);
+  toolbar->addSpacing(12);
   toolbar->addWidget(retryButton_);
-  toolbar->addWidget(removeButton_);
   toolbar->addStretch();
+  toolbar->addWidget(removeButton_);
   auto* layout = new QVBoxLayout(this);
-  layout->addWidget(summaryLabel_);
+  layout->setContentsMargins(22, 20, 22, 18);
+  layout->setSpacing(14);
+  layout->addWidget(title);
+  layout->addWidget(summaryBar);
   layout->addLayout(toolbar);
   layout->addWidget(rootsTable_);
   layout->addWidget(buttons);
@@ -212,7 +234,7 @@ void IndexManagerDialog::applySummaries(const QList<RootIndexSummary>& roots,
       rootsTable_->setCellWidget(row, 6, actions);
     }
     summaryLabel_->setText(
-        QStringLiteral("共 %1 个索引目录，%2 个文件，失败 %3 个，索引文件总大小 %4")
+        QStringLiteral("索引目录 %1    文件 %2    失败 %3    索引大小 %4")
             .arg(roots.size())
             .arg(totalDocuments)
             .arg(totalFailures)
