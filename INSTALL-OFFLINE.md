@@ -8,8 +8,8 @@
 
 ```bash
 chmod +x check-target.sh
-./check-target.sh wensousou_1.0.20_arm64.deb
-sudo dpkg -i wensousou_1.0.20_arm64.deb
+./check-target.sh wensousou_1.1.1_arm64.deb
+sudo dpkg -i wensousou_1.1.1_arm64.deb
 wensousou --self-check
 ```
 
@@ -45,6 +45,9 @@ wensousou-diagnose 党费
 从旧版本升级后，首次启动会保留目录配置并自动清除旧文档索引，随后在后台重新建立
 索引。`1.0.9` 在内置 Qt 中启用 DBus，并随应用携带 Fcitx Qt5 输入法插件，用于修复
 UOS Fcitx 4 环境中搜索框无法调起中文输入法的问题。
+
+`1.1.1` 采用更接近现代 Web 应用的视觉系统，统一浅色背景、白色卡片、圆角控件、
+渐变主按钮、轻阴影、表格和弹窗样式。
 
 `1.0.20` 将命中关键词高亮恢复为黄色，并在设置中加入多档界面字体大小选择。
 
@@ -98,5 +101,5 @@ chmod +x scripts/*.sh parser/build.sh packaging/*.sh
 新安装包生成在：
 
 ```text
-dist/offline-kit/wensousou_1.0.20_arm64.deb
+dist/offline-kit/wensousou_1.1.1_arm64.deb
 ```

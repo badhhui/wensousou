@@ -3,7 +3,7 @@ set -euo pipefail
 
 DEB="${1:-}"
 if [[ -z "${DEB}" || ! -f "${DEB}" ]]; then
-  echo "Usage: $0 wensousou_1.0.20_arm64.deb" >&2
+  echo "Usage: $0 wensousou_1.1.1_arm64.deb" >&2
   exit 2
 fi
 if [[ "$(uname -m)" != "aarch64" ]]; then

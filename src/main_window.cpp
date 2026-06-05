@@ -9,6 +9,7 @@
 #include "settings_dialog.h"
 
 #include <QAction>
+#include <QColor>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -17,6 +18,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
+#include <QGraphicsDropShadowEffect>
 #include <QGridLayout>
 #include <QHeaderView>
 #include <QHBoxLayout>
@@ -94,6 +96,14 @@ QString anchoredHighlightedHtml(QString text, const QString& startMarker,
   return text;
 }
 
+void applyCardShadow(QWidget* widget, int blurRadius = 26, int yOffset = 8) {
+  auto* shadow = new QGraphicsDropShadowEffect(widget);
+  shadow->setBlurRadius(blurRadius);
+  shadow->setOffset(0, yOffset);
+  shadow->setColor(QColor(15, 23, 42, 24));
+  widget->setGraphicsEffect(shadow);
+}
+
 }  // namespace
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
@@ -158,8 +168,8 @@ void MainWindow::setupUi() {
   auto* central = new QWidget(this);
   central->setObjectName(QStringLiteral("appShell"));
   auto* layout = new QVBoxLayout(central);
-  layout->setContentsMargins(32, 26, 32, 18);
-  layout->setSpacing(18);
+  layout->setContentsMargins(34, 28, 34, 20);
+  layout->setSpacing(20);
 
   auto* toolbar = new QHBoxLayout;
   toolbar->setSpacing(14);
@@ -196,9 +206,10 @@ void MainWindow::setupUi() {
 
   searchPanel_ = new QFrame(this);
   searchPanel_->setObjectName(QStringLiteral("searchPanel"));
+  applyCardShadow(searchPanel_);
   auto* controlLayout = new QVBoxLayout(searchPanel_);
-  controlLayout->setContentsMargins(20, 18, 20, 18);
-  controlLayout->setSpacing(14);
+  controlLayout->setContentsMargins(24, 22, 24, 22);
+  controlLayout->setSpacing(16);
 
   auto* directoryHeader = new QHBoxLayout;
   auto* searchTitle = new QLabel(QStringLiteral("搜索本机文档"), this);
@@ -215,14 +226,14 @@ void MainWindow::setupUi() {
   controlLayout->addLayout(directoryHeader);
 
   auto* searchRow = new QHBoxLayout;
-  searchRow->setSpacing(13);
+  searchRow->setSpacing(14);
   searchEdit_ = new QLineEdit(this);
   searchEdit_->setPlaceholderText(QStringLiteral("输入中文关键词进行全文检索"));
   searchEdit_->setClearButtonEnabled(true);
   searchEdit_->setObjectName(QStringLiteral("heroSearch"));
   searchButton_ = new QPushButton(QStringLiteral("搜索"), this);
   searchButton_->setObjectName(QStringLiteral("primaryButton"));
-  searchButton_->setMinimumHeight(48);
+  searchButton_->setMinimumHeight(52);
   searchRow->addWidget(searchEdit_, 1);
   searchRow->addWidget(searchButton_);
   controlLayout->addLayout(searchRow);
@@ -283,6 +294,7 @@ void MainWindow::setupUi() {
 
   resultsTable_ = new QTableWidget(0, 5, this);
   resultsTable_->setObjectName(QStringLiteral("resultsTable"));
+  applyCardShadow(resultsTable_, 22, 7);
   QFont resultFont = resultsTable_->font();
   resultFont.setPointSize(resultFont.pointSize() + 1);
   resultsTable_->setFont(resultFont);
@@ -302,7 +314,7 @@ void MainWindow::setupUi() {
   resultsTable_->setSelectionMode(QAbstractItemView::SingleSelection);
   resultsTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
   resultsTable_->setAlternatingRowColors(true);
-  resultsTable_->verticalHeader()->setDefaultSectionSize(58);
+  resultsTable_->verticalHeader()->setDefaultSectionSize(60);
   resultsTable_->verticalHeader()->setVisible(false);
   layout->addWidget(resultsTable_, 1);
   auto* paging = new QHBoxLayout;

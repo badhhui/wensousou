@@ -1,11 +1,13 @@
-#include "main_window.h"
 #include "index_diagnostics.h"
 #include "logging.h"
+#include "qml_app_controller.h"
 #include "self_check.h"
 
 #include <QApplication>
 #include <QCoreApplication>
 #include <QFont>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QRect>
 #include <QScreen>
 #include <QSize>
@@ -38,7 +40,7 @@ int main(int argc, char* argv[]) {
 
   QCoreApplication::setOrganizationName(QStringLiteral("WenSouSou"));
   QCoreApplication::setApplicationName(QStringLiteral("wensousou"));
-  QCoreApplication::setApplicationVersion(QStringLiteral("1.0.20"));
+  QCoreApplication::setApplicationVersion(QStringLiteral("1.1.1"));
   wensousou::initializeLogging();
 
   bool selfCheck = false;
@@ -70,86 +72,21 @@ int main(int argc, char* argv[]) {
     return ok ? 0 : 1;
   }
 
+  qputenv("QT_QUICK_BACKEND", QByteArrayLiteral("software"));
   QApplication app(argc, argv);
   QFont appFont = app.font();
   const double fontScale = qBound(
       0.85, QSettings().value(QStringLiteral("ui/fontScale"), 1.0).toDouble(), 1.40);
   appFont.setPointSizeF(appFont.pointSizeF() * fontScale);
   app.setFont(appFont);
-  app.setStyleSheet(QStringLiteral(
-      "QMainWindow, QDialog, QWidget#appShell { background: #f5f7fb; color: #172033; }"
-      "QFrame#brandMark { background: #0f766e; border-radius: 9px; }"
-      "QLabel#brandGlyph { color: white; font-size: 25px; font-weight: 700; }"
-      "QLabel#brandTitle { color: #172033; font-size: 26px; font-weight: 700; }"
-      "QLabel#muted, QLabel#resultHint { color: #64748b; }"
-      "QLabel#sectionLabel { color: #64748b; font-size: 14px; font-weight: 700; }"
-      "QLabel#resultTitle { color: #111827; font-size: 21px; font-weight: 700; }"
-      "QLabel#panelTitle { color: #111827; font-size: 24px; font-weight: 700; }"
-      "QLabel#statusPill { background: rgba(255,255,255,0.72); color: #475569;"
-      "  border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 11px; }"
-      "QLabel#summaryPill { background: transparent; color: #334155;"
-      "  border: 0; padding: 2px 4px; }"
-      "QFrame#searchPanel, QFrame#summaryBar { background: #ffffff;"
-      "  border: 1px solid #e6eaf0; border-radius: 10px; }"
-      "QFrame#filterBar { background: #f8fafc; border: 1px solid #edf2f7;"
-      "  border-radius: 8px; }"
-      "QLineEdit, QComboBox, QTableWidget, QTextBrowser, QSpinBox {"
-      "  background: #ffffff; border: 1px solid #d9e1ea; border-radius: 7px; }"
-      "QLineEdit { padding: 10px 12px; selection-background-color: #99f6e4; }"
-      "QLineEdit#heroSearch { border: 1px solid #14b8a6; border-radius: 8px;"
-      "  padding: 14px 15px; background: #ffffff; font-size: 19px; }"
-      "QLineEdit#heroSearch:focus { border: 2px solid #0f766e; padding: 13px 14px; }"
-      "QComboBox { padding: 8px 12px; min-width: 128px; }"
-      "QComboBox#filterCombo, QPushButton#filterButton { background: #ffffff;"
-      "  border-color: #dbe4ee; color: #334155; }"
-      "QComboBox QAbstractItemView, QMenu { background: #ffffff; color: #1f2937;"
-      "  selection-background-color: #d9fdfa; selection-color: #0f172a;"
-      "  border: 1px solid #d9e1ea; }"
-      "QComboBox QAbstractItemView::item, QMenu::item { color: #1f2937;"
-      "  padding: 8px 18px; }"
-      "QComboBox QAbstractItemView::item:hover, QMenu::item:selected {"
-      "  background: #d9fdfa; color: #0f172a; }"
-      "QPushButton { background: #ffffff; color: #334155; border: 1px solid #d9e1ea;"
-      "  border-radius: 7px; padding: 8px 13px; }"
-      "QPushButton:hover { color: #0f766e; border-color: #7dd3fc; background: #f0fdfa; }"
-      "QPushButton#primaryButton { background: #0f766e; color: #ffffff; border-color: #0f766e;"
-      "  font-weight: 700; padding-left: 18px; padding-right: 18px; }"
-      "QPushButton#primaryButton:hover { background: #115e59; border-color: #115e59; }"
-      "QPushButton#quietButton { background: transparent; border-color: #dbe4ee; color: #475569; }"
-      "QPushButton#activePageButton { background: #ccfbf1; border-color: #99f6e4;"
-      "  color: #134e4a; font-weight: 700; }"
-      "QPushButton#activePageButton:disabled { background: #ccfbf1; border-color: #99f6e4;"
-      "  color: #134e4a; }"
-      "QPushButton#dangerButton { background: #fff7f8; color: #be123c; border-color: #fecdd3; }"
-      "QPushButton#dangerButton:hover { background: #fff1f2; border-color: #fda4af; color: #9f1239; }"
-      "QPushButton:disabled { color: #94a3b8; background: #f1f5f9; border-color: #e2e8f0; }"
-      "QHeaderView::section { background: #f8fafc; color: #475569;"
-      "  padding: 10px; border: 0; border-bottom: 1px solid #e2e8f0; font-weight: 700; }"
-      "QTableWidget { color: #1f2937; gridline-color: #eef2f7;"
-      "  alternate-background-color: #f9fbfd; selection-background-color: #ccfbf1;"
-      "  selection-color: #134e4a; }"
-      "QTableWidget::item { padding: 4px; }"
-      "QTableWidget::item:selected { background: #ccfbf1; color: #134e4a; }"
-      "QToolButton { background: #ffffff; border: 1px solid #dbe4ee;"
-      "  border-radius: 6px; padding: 5px; color: #334155; }"
-      "QToolButton:hover { background: #ecfeff; border-color: #67e8f9; }"
-      "QToolButton:disabled { color: #94a3b8; background: #f8fafc; border-color: #e2e8f0; }"
-      "QCheckBox { color: #334155; spacing: 7px; }"
-      "QProgressBar { background: #e2e8f0; border: 0; border-radius: 4px; min-height: 8px; }"
-      "QProgressBar::chunk { background: #0f766e; border-radius: 4px; }"
-      "QStatusBar { background: #ffffff; color: #64748b; border-top: 1px solid #e5e7eb; }"));
-  wensousou::MainWindow window;
-  if (!window.ready()) return 1;
-  if (QScreen* screen = app.primaryScreen()) {
-    const QRect available = screen->availableGeometry();
-    window.resize(defaultWindowSize(available));
-    window.move(available.center() - window.rect().center());
-  }
-  window.show();
-  qInfo("Main window shown.");
-  QTimer::singleShot(0, &window, [&window]() {
-    qInfo("Main window geometry: %dx%d; central widget: %s",
-          window.width(), window.height(), window.centralWidget() ? "yes" : "no");
-  });
+  qmlRegisterType<wensousou::SearchResultsModel>("WenSouSou", 1, 0, "SearchResultsModel");
+  qmlRegisterType<wensousou::RootsModel>("WenSouSou", 1, 0, "RootsModel");
+
+  wensousou::QmlAppController controller;
+  QQmlApplicationEngine engine;
+  engine.rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
+  engine.load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
+  if (engine.rootObjects().isEmpty()) return 1;
+  qInfo("QML main window shown.");
   return app.exec();
 }

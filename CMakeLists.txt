@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
-project(wensousou VERSION 1.0.20 LANGUAGES C CXX)
+project(wensousou VERSION 1.1.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2)
 find_package(Threads REQUIRED)
 
 set(SQLITE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite")
@@ -49,9 +49,19 @@ add_executable(wensousou
   src/main_window.cpp
   src/index_manager_dialog.cpp
   src/settings_dialog.cpp
+  src/qml_app_controller.cpp
+  src/qml_models.cpp
   src/self_check.cpp
+  resources/qml.qrc
 )
-target_link_libraries(wensousou PRIVATE wensousou_core Qt5::Gui Qt5::Widgets)
+target_link_libraries(wensousou PRIVATE
+  wensousou_core
+  Qt5::Gui
+  Qt5::Widgets
+  Qt5::Qml
+  Qt5::Quick
+  Qt5::QuickControls2
+)
 
 install(TARGETS wensousou RUNTIME DESTINATION bin)
 

@@ -10,12 +10,16 @@ QT_WORK_ROOT="${WENSOUSOU_QT_WORK_ROOT:-${WORK_PARENT}/wensousou-qt-build-5.15.2
 QT_SOURCE="${QT_WORK_ROOT}/qt-everywhere-src-5.15.2"
 QT_BUILD="${QT_WORK_ROOT}/build"
 QT_URL="https://mirrors.tuna.tsinghua.edu.cn/qt/archive/qt/5.15/5.15.2/single/qt-everywhere-src-5.15.2.tar.xz"
-QT_CONFIG_MARKER="${QT_PREFIX}/.wensousou-fontconfig-dbus-v2"
+QT_CONFIG_MARKER="${QT_PREFIX}/.wensousou-qml-v1"
 OFFLINE="${WENSOUSOU_OFFLINE:-0}"
 
 qt_is_ready() {
-  [[ -x "${QT_PREFIX}/bin/qmake" ]] &&
+    [[ -x "${QT_PREFIX}/bin/qmake" ]] &&
     [[ -f "${QT_PREFIX}/lib/libQt5Widgets.so" ]] &&
+    [[ -f "${QT_PREFIX}/lib/libQt5Qml.so" ]] &&
+    [[ -f "${QT_PREFIX}/lib/libQt5Quick.so" ]] &&
+    [[ -f "${QT_PREFIX}/lib/cmake/Qt5Qml/Qt5QmlConfig.cmake" ]] &&
+    [[ -d "${QT_PREFIX}/qml/QtQuick/Controls.2" ]] &&
     [[ -f "${QT_PREFIX}/lib/cmake/Qt5/Qt5Config.cmake" ]] &&
     [[ -f "${QT_PREFIX}/plugins/platforms/libqxcb.so" ]] &&
     [[ -f "${QT_CONFIG_MARKER}" ]]
@@ -75,6 +79,18 @@ check_cxx_toolchain() {
   rm -rf "${test_dir}"
 }
 
+prepare_host_tools() {
+  local tools_dir="${QT_WORK_ROOT}/host-tools"
+  mkdir -p "${tools_dir}"
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "Missing build command: python3" >&2
+    echo "Install python3 on the build machine, then rerun this script." >&2
+    exit 1
+  fi
+  ln -sf "$(command -v python3)" "${tools_dir}/python"
+  export PATH="${tools_dir}:${PATH}"
+}
+
 show_qt_config_log() {
   local config_log="${QT_BUILD}/config.log"
   if [[ -f "${config_log}" ]]; then
@@ -115,6 +131,7 @@ fi
 rm -rf "${QT_WORK_ROOT}"
 mkdir -p "${QT_WORK_ROOT}"
 tar -xJf "${QT_ARCHIVE}" -C "${QT_WORK_ROOT}"
+prepare_host_tools
 
 if [[ ! -f "${QT_SOURCE}/qtbase/mkspecs/linux-g++/qmake.conf" ]]; then
   echo "Missing Qt mkspec: linux-g++" >&2
@@ -153,6 +170,7 @@ if ! "${QT_SOURCE}/qtbase/configure" \
   -opensource -confirm-license \
   -release -shared \
   -no-icu -no-opengl \
+  -no-strip \
   -fontconfig -system-freetype \
   -dbus-linked -no-cups \
   -xcb \
@@ -162,6 +180,25 @@ if ! "${QT_SOURCE}/qtbase/configure" \
 fi
 make -j"$(nproc)"
 make install
+
+build_qt_module() {
+  local module="$1"
+  if [[ ! -d "${QT_SOURCE}/${module}" ]]; then
+    echo "Missing Qt module source: ${module}" >&2
+    exit 1
+  fi
+  local module_build="${QT_WORK_ROOT}/build-${module}"
+  rm -rf "${module_build}"
+  mkdir -p "${module_build}"
+  pushd "${module_build}" >/dev/null
+  "${QT_PREFIX}/bin/qmake" "${QT_SOURCE}/${module}/${module}.pro"
+  make -j"$(nproc)"
+  make install
+  popd >/dev/null
+}
+
+build_qt_module qtdeclarative
+build_qt_module qtquickcontrols2
 touch "${QT_CONFIG_MARKER}"
 popd >/dev/null
 echo "Qt installed at ${QT_PREFIX}"

@@ -3,12 +3,14 @@
 #include "app_paths.h"
 #include "database.h"
 
+#include <QColor>
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
+#include <QGraphicsDropShadowEffect>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -77,6 +79,14 @@ QString formatFileSize(qint64 bytes) {
   return QStringLiteral("%1 GB").arg(bytes / 1024.0 / 1024.0 / 1024.0, 0, 'f', 1);
 }
 
+void applyCardShadow(QWidget* widget, int blurRadius = 24, int yOffset = 7) {
+  auto* shadow = new QGraphicsDropShadowEffect(widget);
+  shadow->setBlurRadius(blurRadius);
+  shadow->setOffset(0, yOffset);
+  shadow->setColor(QColor(15, 23, 42, 22));
+  widget->setGraphicsEffect(shadow);
+}
+
 }  // namespace
 
 IndexManagerDialog::IndexManagerDialog(Database* database, QWidget* parent)
@@ -91,6 +101,7 @@ IndexManagerDialog::IndexManagerDialog(Database* database, QWidget* parent)
 
   auto* summaryBar = new QFrame(this);
   summaryBar->setObjectName(QStringLiteral("summaryBar"));
+  applyCardShadow(summaryBar);
   auto* summaryLayout = new QHBoxLayout(summaryBar);
   summaryLayout->setContentsMargins(14, 12, 14, 12);
   summaryLayout->setSpacing(10);
@@ -98,6 +109,7 @@ IndexManagerDialog::IndexManagerDialog(Database* database, QWidget* parent)
 
   rootsTable_ = new QTableWidget(0, 7, this);
   rootsTable_->setObjectName(QStringLiteral("indexTable"));
+  applyCardShadow(rootsTable_, 22, 7);
   rootsTable_->setHorizontalHeaderLabels(
       {QStringLiteral("目录"), QStringLiteral("文件数"), QStringLiteral("失败"),
        QStringLiteral("索引大小"), QStringLiteral("更新时间"), QStringLiteral("状态"),

@@ -12,6 +12,7 @@ RUN printf '%s\n' \
       cmake \
       curl \
       pkg-config \
+      python3 \
       unzip \
       xz-utils \
       libx11-dev \

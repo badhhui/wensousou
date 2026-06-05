@@ -8,7 +8,7 @@ BUILD_DIR="${ROOT_DIR}/build/uos-arm64"
 DIST_DIR="${ROOT_DIR}/dist/offline-kit"
 PACKAGE_ROOT="${ROOT_DIR}/build/package-root"
 APP_ROOT="${PACKAGE_ROOT}/opt/wensousou"
-VERSION="1.0.20"
+VERSION="1.1.1"
 DEB="${DIST_DIR}/wensousou_${VERSION}_arm64.deb"
 MULTIARCH="$(gcc -print-multiarch)"
 FCITX_PLUGIN="/usr/lib/${MULTIARCH}/qt5/plugins/platforminputcontexts/libfcitxplatforminputcontextplugin.so"
@@ -72,8 +72,13 @@ if [[ ! -f "${FCITX_PLUGIN}" ]]; then
 fi
 cp -a "${FCITX_PLUGIN}" "${APP_ROOT}/plugins/platforminputcontexts/"
 cp -a "${QT_PREFIX}"/lib/libQt5Core.so* "${APP_ROOT}/lib/"
-cp -a "${QT_PREFIX}"/lib/libQt5Gui.so* "${APP_ROOT}/lib/"
-cp -a "${QT_PREFIX}"/lib/libQt5Widgets.so* "${APP_ROOT}/lib/"
+cp -a "${QT_PREFIX}"/lib/libQt5*.so* "${APP_ROOT}/lib/"
+if [[ -d "${QT_PREFIX}/qml" ]]; then
+  cp -a "${QT_PREFIX}/qml" "${APP_ROOT}/"
+else
+  echo "Missing Qt QML imports in ${QT_PREFIX}; remove the old Qt cache and rebuild." >&2
+  exit 1
+fi
 if compgen -G "${QT_PREFIX}/lib/libQt5XcbQpa.so*" >/dev/null; then
   cp -a "${QT_PREFIX}"/lib/libQt5XcbQpa.so* "${APP_ROOT}/lib/"
 fi
@@ -89,6 +94,7 @@ cp -a "$(gcc -print-file-name=libgcc_s.so.1)" "${APP_ROOT}/lib/"
 cat >"${APP_ROOT}/bin/qt.conf" <<'EOF'
 [Paths]
 Plugins = ../plugins
+Qml2Imports = ../qml
 EOF
 install -m 755 "${ROOT_DIR}/packaging/wensousou.sh" "${PACKAGE_ROOT}/usr/bin/wensousou"
 install -m 755 "${ROOT_DIR}/packaging/wensousou-diagnose.sh" \
