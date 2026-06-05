@@ -5,6 +5,7 @@
 
 #include <QDialogButtonBox>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QLabel>
@@ -29,6 +30,27 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
   timeoutSeconds_ = new QSpinBox(this);
   timeoutSeconds_->setRange(5, 120);
   timeoutSeconds_->setValue(settings.timeoutSeconds);
+  fontScale_ = new QComboBox(this);
+  const QList<QPair<QString, double>> fontScales = {
+      {QStringLiteral("很小（85%）"), 0.85}, {QStringLiteral("小（90%）"), 0.90},
+      {QStringLiteral("偏小（95%）"), 0.95}, {QStringLiteral("标准（100%）"), 1.00},
+      {QStringLiteral("偏大（105%）"), 1.05}, {QStringLiteral("大（110%）"), 1.10},
+      {QStringLiteral("较大（115%）"), 1.15}, {QStringLiteral("很大（120%）"), 1.20},
+      {QStringLiteral("超大（130%）"), 1.30}, {QStringLiteral("特大（140%）"), 1.40},
+  };
+  const double currentFontScale =
+      QSettings().value(QStringLiteral("ui/fontScale"), 1.0).toDouble();
+  int selectedFontIndex = 0;
+  double bestDistance = 10.0;
+  for (int index = 0; index < fontScales.size(); ++index) {
+    fontScale_->addItem(fontScales.at(index).first, fontScales.at(index).second);
+    const double distance = qAbs(fontScales.at(index).second - currentFontScale);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      selectedFontIndex = index;
+    }
+  }
+  fontScale_->setCurrentIndex(selectedFontIndex);
   startupUpdate_ = new QCheckBox(QStringLiteral("启动文搜搜后自动检查并增量更新索引"), this);
   startupUpdate_->setChecked(
       QSettings().value(QStringLiteral("index/updateOnStartup"), false).toBool());
@@ -37,6 +59,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
   form->addRow(QStringLiteral("单文件大小上限（MB）"), maxFileMb_);
   form->addRow(QStringLiteral("正文字符上限（万字）"), maxCharactersWan_);
   form->addRow(QStringLiteral("单文件解析超时（秒）"), timeoutSeconds_);
+  form->addRow(QStringLiteral("界面字体大小"), fontScale_);
   form->addRow(QStringLiteral("启动检查更新"), startupUpdate_);
 
   auto* typesLabel = new QLabel(QStringLiteral("建立索引的文件类型"), this);
@@ -93,6 +116,7 @@ void SettingsDialog::save() {
                     maxCharactersWan_->value() * 10000);
   settings.setValue(QStringLiteral("index/timeoutSeconds"),
                     timeoutSeconds_->value());
+  settings.setValue(QStringLiteral("ui/fontScale"), fontScale_->currentData().toDouble());
   settings.setValue(QStringLiteral("index/updateOnStartup"), startupUpdate_->isChecked());
   settings.setValue(QStringLiteral("index/enabledExtensions"), enabledExtensions);
   accept();

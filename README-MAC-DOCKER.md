@@ -60,7 +60,7 @@ chmod +x scripts/*.sh parser/build.sh packaging/*.sh
 
 ```text
 dist/offline-kit/
-  wensousou_1.0.19_arm64.deb
+  wensousou_1.0.20_arm64.deb
   check-target.sh
   INSTALL-OFFLINE.md
   SHA256SUMS
@@ -125,14 +125,14 @@ third_party/cache/
 docker run --rm --platform linux/arm64 \
   -v "$PWD:/workspace" \
   wensousou-builder-buster-arm64 \
-  bash -lc 'cd /workspace/dist/offline-kit && ./check-target.sh wensousou_1.0.19_arm64.deb'
+  bash -lc 'cd /workspace/dist/offline-kit && ./check-target.sh wensousou_1.0.20_arm64.deb'
 ```
 
 通过时会看到：
 
 ```text
 Target preflight passed. Install with:
-  sudo dpkg -i wensousou_1.0.19_arm64.deb
+  sudo dpkg -i wensousou_1.0.20_arm64.deb
 ```
 
 ## 复制到离线 UOS 安装
@@ -141,8 +141,8 @@ Target preflight passed. Install with:
 
 ```bash
 cd offline-kit
-./check-target.sh wensousou_1.0.19_arm64.deb
-sudo dpkg -i wensousou_1.0.19_arm64.deb
+./check-target.sh wensousou_1.0.20_arm64.deb
+sudo dpkg -i wensousou_1.0.20_arm64.deb
 wensousou --self-check
 ```
 

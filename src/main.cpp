@@ -9,6 +9,7 @@
 #include <QRect>
 #include <QScreen>
 #include <QSize>
+#include <QSettings>
 #include <QTextCodec>
 #include <QTextStream>
 #include <QTimer>
@@ -37,7 +38,7 @@ int main(int argc, char* argv[]) {
 
   QCoreApplication::setOrganizationName(QStringLiteral("WenSouSou"));
   QCoreApplication::setApplicationName(QStringLiteral("wensousou"));
-  QCoreApplication::setApplicationVersion(QStringLiteral("1.0.19"));
+  QCoreApplication::setApplicationVersion(QStringLiteral("1.0.20"));
   wensousou::initializeLogging();
 
   bool selfCheck = false;
@@ -71,7 +72,9 @@ int main(int argc, char* argv[]) {
 
   QApplication app(argc, argv);
   QFont appFont = app.font();
-  appFont.setPointSizeF(appFont.pointSizeF() * 1.18);
+  const double fontScale = qBound(
+      0.85, QSettings().value(QStringLiteral("ui/fontScale"), 1.0).toDouble(), 1.40);
+  appFont.setPointSizeF(appFont.pointSizeF() * fontScale);
   app.setFont(appFont);
   app.setStyleSheet(QStringLiteral(
       "QMainWindow, QDialog, QWidget#appShell { background: #f5f7fb; color: #172033; }"

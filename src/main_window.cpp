@@ -65,7 +65,7 @@ QString highlightedHtml(QString text, const QString& startMarker,
                         const QString& endMarker) {
   text = text.toHtmlEscaped();
   text.replace(startMarker,
-               QStringLiteral("<span style=\"background-color:#d9f99d;"
+               QStringLiteral("<span style=\"background-color:#fff19a;"
                               "color:#1f2937;border-radius:3px;\">"));
   text.replace(endMarker, QStringLiteral("</span>"));
   return text;
@@ -79,7 +79,7 @@ QString anchoredHighlightedHtml(QString text, const QString& startMarker,
   int position = 0;
   while ((position = text.indexOf(startMarker, position)) >= 0) {
     const QString color = count == currentMatch ? QStringLiteral("#fdba74")
-                                                : QStringLiteral("#d9f99d");
+                                                : QStringLiteral("#fff19a");
     const QString replacement =
         QStringLiteral("<a name=\"match-%1\"></a><span style=\""
                        "background-color:%2;color:#1f2328;\">")

@@ -5,6 +5,7 @@
 
 class QSpinBox;
 class QCheckBox;
+class QComboBox;
 
 namespace wensousou {
 
@@ -21,6 +22,7 @@ class SettingsDialog : public QDialog {
   QSpinBox* maxFileMb_ = nullptr;
   QSpinBox* maxCharactersWan_ = nullptr;
   QSpinBox* timeoutSeconds_ = nullptr;
+  QComboBox* fontScale_ = nullptr;
   QCheckBox* startupUpdate_ = nullptr;
   QList<QCheckBox*> extensionChecks_;
 };

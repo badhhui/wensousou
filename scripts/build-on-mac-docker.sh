@@ -36,4 +36,4 @@ docker run --rm --platform linux/arm64 \
   bash -lc "cd /workspace && ./scripts/build-offline-local.sh"
 
 echo "Mac Docker build completed:"
-echo "  ${ROOT_DIR}/dist/offline-kit/wensousou_1.0.19_arm64.deb"
+echo "  ${ROOT_DIR}/dist/offline-kit/wensousou_1.0.20_arm64.deb"
