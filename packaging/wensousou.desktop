@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=文搜搜
+Comment=离线文档全文检索
+Exec=/usr/bin/wensousou
+Icon=wensousou
+Terminal=false
+Categories=Office;Utility;
+StartupNotify=true

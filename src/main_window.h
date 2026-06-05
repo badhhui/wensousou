@@ -1,0 +1,112 @@
+#pragma once
+
+#include "database.h"
+
+#include <QMainWindow>
+#include <QStringList>
+#include <QThread>
+
+class QComboBox;
+class QHBoxLayout;
+class QLabel;
+class QLineEdit;
+class QMenu;
+class QProgressBar;
+class QPushButton;
+class QTableWidget;
+class QFrame;
+class QAction;
+
+namespace wensousou {
+
+class IndexWorker;
+class SearchWorker;
+
+class MainWindow : public QMainWindow {
+  Q_OBJECT
+
+ public:
+  explicit MainWindow(QWidget* parent = nullptr);
+  ~MainWindow() override;
+  bool ready() const;
+
+ private slots:
+  void updateAllRoots();
+  void retryFailures();
+  void cancelIndexing();
+  void showSettings();
+  void showIndexManager();
+  void toggleSearchPanel();
+  void handleResultHeaderClicked(int column);
+  void refreshRoots();
+  void searchFirstPage();
+  void searchPreviousPage();
+  void searchNextPage();
+  void changePageSize();
+  void openSelectedDocument();
+  void applyResultFilters();
+  void handleIndexRunning(bool running);
+  void handleIndexFinished(bool success, const QString& message);
+  void handleProgress(const QString& currentFile, int processed, int failed, int total);
+  void handleSearchFinished(qint64 requestId, const QList<SearchResult>& results,
+                            int totalCount, const QString& error, qint64 elapsedMs);
+
+ private:
+  void setupUi();
+  void scheduleStartupIndexUpdate();
+  void runSearch();
+  void renderCurrentPage();
+  void updatePagination();
+  void rebuildTypeFilterMenu();
+  void setAllTypeFilters(bool checked);
+  QStringList selectedTypeFilters() const;
+  bool resultPassesTypeFilter(const SearchResult& result) const;
+  void showDocumentPreview(qint64 documentId, const QString& filename,
+                           const QString& path);
+  void openDocument(const QString& path);
+  void openContainingFolder(const QString& path);
+  QString selectedDocumentPath() const;
+
+  Database database_;
+  bool ready_ = false;
+  QThread indexThread_;
+  IndexWorker* indexWorker_ = nullptr;
+  QThread searchThread_;
+  SearchWorker* searchWorker_ = nullptr;
+
+  QFrame* searchPanel_ = nullptr;
+  QLineEdit* searchEdit_ = nullptr;
+  QComboBox* rootFilter_ = nullptr;
+  QPushButton* extensionFilterButton_ = nullptr;
+  QMenu* extensionFilterMenu_ = nullptr;
+  QList<QAction*> extensionActions_;
+  QComboBox* modifiedFilter_ = nullptr;
+  QTableWidget* resultsTable_ = nullptr;
+  QLabel* rootsStatusPill_ = nullptr;
+  QLabel* indexStatusPill_ = nullptr;
+  QLabel* resultStatusPill_ = nullptr;
+  QLabel* resultTitleLabel_ = nullptr;
+  QLabel* resultHintLabel_ = nullptr;
+  QLabel* statusLabel_ = nullptr;
+  QLabel* indexProgressLabel_ = nullptr;
+  QLabel* pageLabel_ = nullptr;
+  QProgressBar* searchProgress_ = nullptr;
+  QPushButton* previousButton_ = nullptr;
+  QPushButton* nextButton_ = nullptr;
+  QPushButton* searchButton_ = nullptr;
+  QPushButton* collapseButton_ = nullptr;
+  QComboBox* pageSizeCombo_ = nullptr;
+  QHBoxLayout* pageButtonsLayout_ = nullptr;
+  int page_ = 0;
+  int pageSize_ = 50;
+  int totalResultCount_ = 0;
+  int lastResultCount_ = 0;
+  qint64 latestSearchRequestId_ = 0;
+  SearchSort searchSort_ = SearchSort::Relevance;
+  QList<SearchResult> cachedSearchResults_;
+  QList<SearchResult> filteredSearchResults_;
+  QString lastSearchQuery_;
+  qint64 lastSearchElapsedMs_ = 0;
+};
+
+}  // namespace wensousou

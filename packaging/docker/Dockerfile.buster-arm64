@@ -1,0 +1,44 @@
+FROM docker.m.daocloud.io/library/debian:buster-slim
+
+RUN printf '%s\n' \
+      'deb [check-valid-until=no] http://archive.debian.org/debian buster main' \
+      'deb [check-valid-until=no] http://archive.debian.org/debian buster-updates main' \
+      'deb [check-valid-until=no] http://archive.debian.org/debian-security buster/updates main' \
+      > /etc/apt/sources.list \
+    && apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Retries=8 update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=8 install -y --no-install-recommends \
+      build-essential \
+      ca-certificates \
+      cmake \
+      curl \
+      pkg-config \
+      unzip \
+      xz-utils \
+      libx11-dev \
+      libx11-xcb-dev \
+      libxcb1-dev \
+      libxcb-icccm4-dev \
+      libxcb-util0-dev \
+      libxcb-image0-dev \
+      libxcb-keysyms1-dev \
+      libxcb-render-util0-dev \
+      libxcb-randr0-dev \
+      libxcb-render0-dev \
+      libxcb-shape0-dev \
+      libxcb-shm0-dev \
+      libxcb-sync-dev \
+      libxcb-xfixes0-dev \
+      libxcb-xinerama0-dev \
+      libxcb-xkb-dev \
+      libxkbcommon-dev \
+      libxkbcommon-x11-dev \
+      libfontconfig1-dev \
+      libfreetype6-dev \
+      libdbus-1-dev \
+    && mkdir -p /tmp/fcitx-plugin \
+    && cd /tmp/fcitx-plugin \
+    && apt-get -o Acquire::Retries=8 download fcitx-frontend-qt5 \
+    && dpkg-deb -x ./fcitx-frontend-qt5_*.deb / \
+    && cd / \
+    && rm -rf /tmp/fcitx-plugin \
+    && rm -rf /var/lib/apt/lists/*
