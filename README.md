@@ -44,7 +44,7 @@ chmod +x scripts/*.sh parser/build.sh packaging/wensousou.sh
 
 ```text
 dist/offline-kit/
-  wensousou_1.1.0_arm64.deb
+  wensousou_1.1.2_arm64.deb
   check-target.sh
   INSTALL-OFFLINE.md
   SHA256SUMS
@@ -104,7 +104,7 @@ chmod +x scripts/*.sh parser/build.sh packaging/*.sh
 该命令禁止联网下载。缓存不完整时会直接列出缺少的文件。构建结果仍然输出到：
 
 ```text
-dist/offline-kit/wensousou_1.1.0_arm64.deb
+dist/offline-kit/wensousou_1.1.2_arm64.deb
 ```
 
 如果断网机器缺少编译工具或 XCB 开发包，需要通过 U 盘补齐对应的 `.deb` 安装包；
@@ -127,7 +127,7 @@ chmod +x scripts/build-on-mac-docker.sh
 输出仍然位于：
 
 ```text
-dist/offline-kit/wensousou_1.1.0_arm64.deb
+dist/offline-kit/wensousou_1.1.2_arm64.deb
 ```
 
 ## 开发构建

@@ -323,6 +323,64 @@ bool Database::removeRoot(qint64 rootId, QString* error) {
   return true;
 }
 
+bool Database::removeDocument(qint64 documentId, QString* error) {
+  if (!begin(error)) return false;
+  qint64 rootId = 0;
+  {
+    Statement lookup(db_, QStringLiteral("SELECT root_id FROM documents WHERE id=?;"),
+                     error);
+    if (!lookup.valid()) {
+      rollback();
+      return false;
+    }
+    sqlite3_bind_int64(lookup.get(), 1, documentId);
+    const int lookupResult = sqlite3_step(lookup.get());
+    if (lookupResult == SQLITE_ROW) {
+      rootId = sqlite3_column_int64(lookup.get(), 0);
+    } else if (lookupResult != SQLITE_DONE) {
+      if (error) *error = sqliteError(db_);
+      rollback();
+      return false;
+    }
+  }
+
+  Statement remove(db_, QStringLiteral("DELETE FROM documents WHERE id=?;"), error);
+  if (!remove.valid()) {
+    rollback();
+    return false;
+  }
+  sqlite3_bind_int64(remove.get(), 1, documentId);
+  if (sqlite3_step(remove.get()) != SQLITE_DONE) {
+    if (error) *error = sqliteError(db_);
+    rollback();
+    return false;
+  }
+
+  if (rootId > 0) {
+    Statement root(db_, QStringLiteral(
+        "UPDATE roots SET "
+        "document_count=(SELECT COUNT(*) FROM documents WHERE root_id=?),"
+        "failed_count=(SELECT COUNT(*) FROM documents WHERE root_id=? AND status='failed'),"
+        "total_size=COALESCE((SELECT SUM(size) FROM documents WHERE root_id=?),0) "
+        "WHERE id=?;"),
+        error);
+    if (!root.valid()) {
+      rollback();
+      return false;
+    }
+    sqlite3_bind_int64(root.get(), 1, rootId);
+    sqlite3_bind_int64(root.get(), 2, rootId);
+    sqlite3_bind_int64(root.get(), 3, rootId);
+    sqlite3_bind_int64(root.get(), 4, rootId);
+    if (sqlite3_step(root.get()) != SQLITE_DONE) {
+      if (error) *error = sqliteError(db_);
+      rollback();
+      return false;
+    }
+  }
+  return commit(error);
+}
+
 QList<RootIndexSummary> Database::rootIndexSummaries(QString* error) const {
   QList<RootIndexSummary> records;
   Statement statement(db_, QStringLiteral(R"SQL(
@@ -529,30 +587,47 @@ ON CONFLICT(path) DO UPDATE SET
 }
 
 QList<SearchResult> Database::search(const QString& query, qint64 rootId,
-                                     const QString& extension, qint64 modifiedAfterMs,
-                                     SearchSort sort, int limit, int offset, QString* error,
-                                     int* totalCount) const {
+                                     const QStringList& extensions,
+                                     qint64 modifiedAfterMs, SearchSort sort,
+                                     int limit, int offset, QString* error,
+                                     int* totalCount, bool countTotal) const {
   QList<SearchResult> results;
   const QString ftsQuery = buildFtsQuery(query);
   if (totalCount) *totalCount = 0;
   if (ftsQuery.isEmpty()) return results;
+  QStringList normalizedExtensions;
+  for (QString extension : extensions) {
+    extension = extension.trimmed().toLower();
+    if (!extension.isEmpty() && !normalizedExtensions.contains(extension)) {
+      normalizedExtensions.append(extension);
+    }
+  }
   QString where = QStringLiteral(
       "FROM documents_fts JOIN documents d ON d.id=documents_fts.rowid "
       "WHERE documents_fts MATCH ? AND d.status='ok' ");
   if (rootId > 0) where += QStringLiteral("AND d.root_id=? ");
-  if (!extension.isEmpty()) where += QStringLiteral("AND d.extension=? ");
+  if (!normalizedExtensions.isEmpty()) {
+    where += QStringLiteral("AND d.extension IN (");
+    for (int index = 0; index < normalizedExtensions.size(); ++index) {
+      if (index > 0) where += QLatin1Char(',');
+      where += QLatin1Char('?');
+    }
+    where += QStringLiteral(") ");
+  }
   if (modifiedAfterMs > 0) where += QStringLiteral("AND d.mtime_ms>=? ");
 
   auto bindFilters = [&](sqlite3_stmt* statement) {
     int parameter = 1;
     bindText(statement, parameter++, ftsQuery);
     if (rootId > 0) sqlite3_bind_int64(statement, parameter++, rootId);
-    if (!extension.isEmpty()) bindText(statement, parameter++, extension);
+    for (const QString& extension : normalizedExtensions) {
+      bindText(statement, parameter++, extension);
+    }
     if (modifiedAfterMs > 0) sqlite3_bind_int64(statement, parameter++, modifiedAfterMs);
     return parameter;
   };
 
-  if (totalCount) {
+  if (totalCount && countTotal) {
     Statement count(db_, QStringLiteral("SELECT COUNT(*) ") + where + QLatin1Char(';'),
                     error);
     if (!count.valid()) return results;
@@ -576,16 +651,28 @@ QList<SearchResult> Database::search(const QString& query, qint64 rootId,
       orderBy = QStringLiteral("ORDER BY documents_fts.rank,d.mtime_ms DESC ");
       break;
   }
+  QString pagination;
+  if (limit > 0) {
+    pagination = QStringLiteral("LIMIT ? OFFSET ?;");
+  } else if (offset > 0) {
+    pagination = QStringLiteral("LIMIT -1 OFFSET ?;");
+  } else {
+    pagination = QStringLiteral(";");
+  }
   const QString sql =
       QStringLiteral(
           "SELECT d.id,d.root_id,d.filename,d.path,d.extension,d.size,d.mtime_ms,"
           "documents_fts.rank ") +
-      where + orderBy + QStringLiteral("LIMIT ? OFFSET ?;");
+      where + orderBy + pagination;
   Statement statement(db_, sql, error);
   if (!statement.valid()) return results;
   int parameter = bindFilters(statement.get());
-  sqlite3_bind_int(statement.get(), parameter++, limit);
-  sqlite3_bind_int(statement.get(), parameter++, offset);
+  if (limit > 0) {
+    sqlite3_bind_int(statement.get(), parameter++, limit);
+    sqlite3_bind_int(statement.get(), parameter++, offset);
+  } else if (offset > 0) {
+    sqlite3_bind_int(statement.get(), parameter++, offset);
+  }
   while (sqlite3_step(statement.get()) == SQLITE_ROW) {
     SearchResult result;
     result.id = sqlite3_column_int64(statement.get(), 0);
@@ -602,6 +689,7 @@ QList<SearchResult> Database::search(const QString& query, qint64 rootId,
       error) {
     *error = sqliteError(db_);
   }
+  if (totalCount && !countTotal) *totalCount = results.size();
   Statement snippet(db_, QStringLiteral(
       "SELECT highlight(documents_fts,0,'【','】'),"
       "simple_snippet(documents_fts,1,'【','】','...',40) "

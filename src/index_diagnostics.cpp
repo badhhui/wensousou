@@ -45,7 +45,7 @@ bool runIndexDiagnostics(const QString& query, QString* report) {
 
   if (!query.trimmed().isEmpty()) {
     const QList<SearchResult> results =
-        database.search(query, 0, QString(), 0, SearchSort::Relevance, 20, 0, &error);
+        database.search(query, 0, QStringList(), 0, SearchSort::Relevance, 20, 0, &error);
     if (!error.isEmpty()) {
       lines.append(QStringLiteral("诊断搜索失败：%1").arg(error));
       *report = lines.join(QLatin1Char('\n'));

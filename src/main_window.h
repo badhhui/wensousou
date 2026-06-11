@@ -3,6 +3,7 @@
 #include "database.h"
 
 #include <QMainWindow>
+#include <QPoint>
 #include <QStringList>
 #include <QThread>
 
@@ -10,12 +11,12 @@ class QComboBox;
 class QHBoxLayout;
 class QLabel;
 class QLineEdit;
-class QMenu;
 class QProgressBar;
 class QPushButton;
 class QTableWidget;
 class QFrame;
-class QAction;
+class QCheckBox;
+class QWidget;
 
 namespace wensousou {
 
@@ -34,6 +35,7 @@ class MainWindow : public QMainWindow {
   void updateAllRoots();
   void retryFailures();
   void cancelIndexing();
+  void addIndexRoot();
   void showSettings();
   void showIndexManager();
   void toggleSearchPanel();
@@ -45,6 +47,7 @@ class MainWindow : public QMainWindow {
   void changePageSize();
   void openSelectedDocument();
   void applyResultFilters();
+  void showResultContextMenu(const QPoint& position);
   void handleIndexRunning(bool running);
   void handleIndexFinished(bool success, const QString& message);
   void handleProgress(const QString& currentFile, int processed, int failed, int total);
@@ -59,12 +62,17 @@ class MainWindow : public QMainWindow {
   void updatePagination();
   void rebuildTypeFilterMenu();
   void setAllTypeFilters(bool checked);
+  void invertTypeFilters();
   QStringList selectedTypeFilters() const;
   bool resultPassesTypeFilter(const SearchResult& result) const;
+  int configuredSearchResultLimit() const;
+  bool resultForRow(int row, SearchResult* result) const;
   void showDocumentPreview(qint64 documentId, const QString& filename,
                            const QString& path);
   void openDocument(const QString& path);
   void openContainingFolder(const QString& path);
+  void copyTextToClipboard(const QString& text);
+  void deleteDocumentFile(const SearchResult& result);
   QString selectedDocumentPath() const;
 
   Database database_;
@@ -77,9 +85,9 @@ class MainWindow : public QMainWindow {
   QFrame* searchPanel_ = nullptr;
   QLineEdit* searchEdit_ = nullptr;
   QComboBox* rootFilter_ = nullptr;
-  QPushButton* extensionFilterButton_ = nullptr;
-  QMenu* extensionFilterMenu_ = nullptr;
-  QList<QAction*> extensionActions_;
+  QWidget* extensionFilterWidget_ = nullptr;
+  QHBoxLayout* extensionFilterLayout_ = nullptr;
+  QList<QCheckBox*> extensionChecks_;
   QComboBox* modifiedFilter_ = nullptr;
   QTableWidget* resultsTable_ = nullptr;
   QLabel* rootsStatusPill_ = nullptr;
@@ -107,6 +115,7 @@ class MainWindow : public QMainWindow {
   QList<SearchResult> filteredSearchResults_;
   QString lastSearchQuery_;
   qint64 lastSearchElapsedMs_ = 0;
+  int lastSearchLimit_ = 0;
 };
 
 }  // namespace wensousou

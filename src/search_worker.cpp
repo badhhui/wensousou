@@ -38,8 +38,8 @@ void SearchWorker::cancelBefore(qint64 requestId) {
 }
 
 void SearchWorker::search(qint64 requestId, const QString& query, qint64 rootId,
-                          const QString& extension, qint64 modifiedAfterMs,
-                          SearchSort sort, int limit, int offset) {
+                          const QStringList& extensions, qint64 modifiedAfterMs,
+                          SearchSort sort, int limit, int offset, bool countTotal) {
   QElapsedTimer timer;
   timer.start();
   if (requestId != latestRequestId_.load()) {
@@ -53,16 +53,18 @@ void SearchWorker::search(qint64 requestId, const QString& query, qint64 rootId,
   }
   int totalCount = 0;
   const QList<SearchResult> results = database_.search(
-      query, rootId, extension, modifiedAfterMs, sort, limit, offset, &error, &totalCount);
+      query, rootId, extensions, modifiedAfterMs, sort, limit, offset, &error,
+      &totalCount, countTotal);
   qInfo() << "Search finished"
           << "requestId=" << requestId
           << "query=" << query
           << "rootId=" << rootId
-          << "extension=" << extension
+          << "extensions=" << extensions
           << "modifiedAfterMs=" << modifiedAfterMs
           << "sort=" << static_cast<int>(sort)
           << "limit=" << limit
           << "offset=" << offset
+          << "countTotal=" << countTotal
           << "results=" << results.size()
           << "totalCount=" << totalCount
           << "elapsedMs=" << timer.elapsed()

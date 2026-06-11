@@ -52,19 +52,19 @@ bool runSelfCheck(QString* report) {
     *report = QStringLiteral("失败：%1").arg(error);
     return false;
   }
-  if (database.search(QStringLiteral("中华"), 0, QString(), 0, SearchSort::Relevance,
+  if (database.search(QStringLiteral("中华"), 0, QStringList(), 0, SearchSort::Relevance,
                       10, 0, &error).isEmpty()) {
     *report = QStringLiteral("失败：中文搜索未命中。%1").arg(error);
     return false;
   }
-  if (!database.search(QStringLiteral("zhonghua"), 0, QString(), 0, SearchSort::Relevance,
+  if (!database.search(QStringLiteral("zhonghua"), 0, QStringList(), 0, SearchSort::Relevance,
                        10, 0, &error)
            .isEmpty()) {
     *report = QStringLiteral("失败：拼音搜索仍处于启用状态。%1").arg(error);
     return false;
   }
   const QString preview = database.previewDocument(
-      database.search(QStringLiteral("中华"), 0, QString(), 0, SearchSort::Relevance,
+      database.search(QStringLiteral("中华"), 0, QStringList(), 0, SearchSort::Relevance,
                       10, 0, &error).first().id,
       QStringLiteral("中华"), &error);
   if (!preview.contains(QStringLiteral("[[["))) {

@@ -4,6 +4,7 @@
 #include <QList>
 #include <QMetaType>
 #include <QString>
+#include <QStringList>
 
 struct sqlite3;
 
@@ -109,9 +110,10 @@ class Database {
                    QString* error);
 
   QList<SearchResult> search(const QString& query, qint64 rootId,
-                             const QString& extension, qint64 modifiedAfterMs,
+                             const QStringList& extensions, qint64 modifiedAfterMs,
                              SearchSort sort, int limit, int offset, QString* error,
-                             int* totalCount = nullptr) const;
+                             int* totalCount = nullptr, bool countTotal = true) const;
+  bool removeDocument(qint64 documentId, QString* error);
   bool warmUpSearch(QString* error) const;
   QString previewDocument(qint64 documentId, const QString& query,
                           QString* error) const;

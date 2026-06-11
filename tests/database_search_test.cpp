@@ -14,6 +14,7 @@ class DatabaseSearchTest : public QObject {
  private slots:
   void findsNormalizedChineseContent();
   void returnsTotalCountAndNewestDocumentsFirst();
+  void filtersExtensionsAndCanSkipExactCount();
   void reportsRootSummaryAndFailures();
   void clearsDocumentsFromOlderSchema();
 };
@@ -39,18 +40,18 @@ void DatabaseSearchTest::findsNormalizedChineseContent() {
   QVERIFY2(database.finishScan(scanId, root.id, true, QString(), &error),
            qPrintable(error));
 
-  QCOMPARE(database.search(QStringLiteral("投资处"), 0, QString(), 0, SearchSort::Relevance,
+  QCOMPARE(database.search(QStringLiteral("投资处"), 0, QStringList(), 0, SearchSort::Relevance,
                            10, 0, &error).size(), 1);
   const QList<SearchResult> filenameMatch =
-      database.search(QStringLiteral("document"), 0, QString(), 0,
+      database.search(QStringLiteral("document"), 0, QStringList(), 0,
                       SearchSort::Relevance, 10, 0, &error);
   QCOMPARE(filenameMatch.size(), 1);
   QCOMPARE(filenameMatch.first().highlightedFilename,
            QStringLiteral("【document】.txt"));
-  QCOMPARE(database.search(QStringLiteral("党费"), 0, QString(), 0, SearchSort::Relevance,
+  QCOMPARE(database.search(QStringLiteral("党费"), 0, QStringList(), 0, SearchSort::Relevance,
                            10, 0, &error).size(),
            1);
-  QCOMPARE(database.search(QStringLiteral("投资处 党费"), 0, QString(), 0,
+  QCOMPARE(database.search(QStringLiteral("投资处 党费"), 0, QStringList(), 0,
                            SearchSort::Relevance, 10, 0, &error)
                .size(),
            1);
@@ -84,12 +85,49 @@ void DatabaseSearchTest::returnsTotalCountAndNewestDocumentsFirst() {
 
   int totalCount = 0;
   const QList<SearchResult> firstPage =
-      database.search(QStringLiteral("党费"), 0, QString(), 0,
+      database.search(QStringLiteral("党费"), 0, QStringList(), 0,
                       SearchSort::ModifiedDescending, 2, 0, &error, &totalCount);
   QCOMPARE(totalCount, 3);
   QCOMPARE(firstPage.size(), 2);
   QCOMPARE(firstPage.at(0).filename, QStringLiteral("new.txt"));
   QCOMPARE(firstPage.at(1).filename, QStringLiteral("middle.txt"));
+  QVERIFY2(error.isEmpty(), qPrintable(error));
+}
+
+void DatabaseSearchTest::filtersExtensionsAndCanSkipExactCount() {
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+
+  Database database;
+  QString error;
+  QVERIFY2(database.open(temporary.filePath(QStringLiteral("index.db")),
+                         QStringLiteral(WENSOUSOU_TEST_SIMPLE_LIB), &error),
+           qPrintable(error));
+  QVERIFY2(database.addRoot(temporary.path(), &error), qPrintable(error));
+  const RootRecord root = database.roots(&error).first();
+  const qint64 scanId = database.beginScan(root.id, &error);
+  QVERIFY2(scanId > 0, qPrintable(error));
+  QVERIFY2(database.upsertDocument(root.id, temporary.filePath(QStringLiteral("a.doc")),
+                                   10, 1000, QStringLiteral("党费"), scanId, &error),
+           qPrintable(error));
+  QVERIFY2(database.upsertDocument(root.id, temporary.filePath(QStringLiteral("b.pdf")),
+                                   10, 2000, QStringLiteral("党费"), scanId, &error),
+           qPrintable(error));
+  QVERIFY2(database.upsertDocument(root.id, temporary.filePath(QStringLiteral("c.xlsx")),
+                                   10, 3000, QStringLiteral("党费"), scanId, &error),
+           qPrintable(error));
+  QVERIFY2(database.finishScan(scanId, root.id, true, QString(), &error),
+           qPrintable(error));
+
+  int totalCount = 0;
+  const QList<SearchResult> limited =
+      database.search(QStringLiteral("党费"), 0,
+                      QStringList{QStringLiteral("doc"), QStringLiteral("xlsx")}, 0,
+                      SearchSort::ModifiedDescending, 1, 0, &error, &totalCount,
+                      false);
+  QCOMPARE(totalCount, 1);
+  QCOMPARE(limited.size(), 1);
+  QCOMPARE(limited.first().filename, QStringLiteral("c.xlsx"));
   QVERIFY2(error.isEmpty(), qPrintable(error));
 }
 

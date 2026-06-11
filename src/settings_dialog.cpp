@@ -3,6 +3,7 @@
 #include "index_worker.h"
 #include "root_policy.h"
 
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QCheckBox>
 #include <QComboBox>
@@ -10,6 +11,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
 #include <QVBoxLayout>
@@ -51,6 +53,27 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     }
   }
   fontScale_->setCurrentIndex(selectedFontIndex);
+  resultLimit_ = new QComboBox(this);
+  const QList<QPair<QString, int>> resultLimits = {
+      {QStringLiteral("不限制（默认）"), 0},
+      {QStringLiteral("50 条"), 50},
+      {QStringLiteral("100 条"), 100},
+      {QStringLiteral("200 条"), 200},
+      {QStringLiteral("500 条"), 500},
+      {QStringLiteral("1000 条"), 1000},
+      {QStringLiteral("2000 条"), 2000},
+      {QStringLiteral("5000 条"), 5000},
+  };
+  const int currentResultLimit =
+      QSettings().value(QStringLiteral("search/resultLimit"), 0).toInt();
+  int selectedResultLimit = 0;
+  for (int index = 0; index < resultLimits.size(); ++index) {
+    resultLimit_->addItem(resultLimits.at(index).first, resultLimits.at(index).second);
+    if (resultLimits.at(index).second == currentResultLimit) {
+      selectedResultLimit = index;
+    }
+  }
+  resultLimit_->setCurrentIndex(selectedResultLimit);
   startupUpdate_ = new QCheckBox(QStringLiteral("启动文搜搜后自动检查并增量更新索引"), this);
   startupUpdate_->setChecked(
       QSettings().value(QStringLiteral("index/updateOnStartup"), false).toBool());
@@ -60,6 +83,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
   form->addRow(QStringLiteral("正文字符上限（万字）"), maxCharactersWan_);
   form->addRow(QStringLiteral("单文件解析超时（秒）"), timeoutSeconds_);
   form->addRow(QStringLiteral("界面字体大小"), fontScale_);
+  form->addRow(QStringLiteral("搜索结果保留条数"), resultLimit_);
   form->addRow(QStringLiteral("启动检查更新"), startupUpdate_);
 
   auto* typesLabel = new QLabel(QStringLiteral("建立索引的文件类型"), this);
@@ -86,6 +110,24 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
   note->setWordWrap(true);
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel,
                                         this);
+  auto* aboutButton =
+      buttons->addButton(QStringLiteral("关于文搜搜"), QDialogButtonBox::HelpRole);
+  connect(aboutButton, &QPushButton::clicked, this, [this]() {
+    QMessageBox about(this);
+    about.setWindowTitle(QStringLiteral("关于文搜搜"));
+    about.setTextFormat(Qt::RichText);
+    about.setTextInteractionFlags(Qt::TextBrowserInteraction);
+    about.setText(
+        QStringLiteral("<h3>文搜搜</h3>"
+                       "<p>作者：hhui<br>"
+                       "邮箱反馈：<a href=\"mailto:badhhui@163.com\">"
+                       "badhhui@163.com</a><br>"
+                       "当前版本号：%1<br>"
+                       "仓库地址：<a href=\"https://github.com/badhhui/wensousou\">"
+                       "badhhui/wensousou</a></p>")
+            .arg(QCoreApplication::applicationVersion()));
+    about.exec();
+  });
   connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::save);
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
@@ -117,6 +159,7 @@ void SettingsDialog::save() {
   settings.setValue(QStringLiteral("index/timeoutSeconds"),
                     timeoutSeconds_->value());
   settings.setValue(QStringLiteral("ui/fontScale"), fontScale_->currentData().toDouble());
+  settings.setValue(QStringLiteral("search/resultLimit"), resultLimit_->currentData().toInt());
   settings.setValue(QStringLiteral("index/updateOnStartup"), startupUpdate_->isChecked());
   settings.setValue(QStringLiteral("index/enabledExtensions"), enabledExtensions);
   accept();

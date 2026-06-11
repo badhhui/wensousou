@@ -9,11 +9,15 @@
 #include "settings_dialog.h"
 
 #include <QAction>
+#include <QApplication>
+#include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -44,7 +48,6 @@ namespace wensousou {
 namespace {
 
 constexpr int kPreviewCharacterLimit = 1'000'000;
-constexpr int kMaxCachedSearchResults = 20'000;
 
 QString formatTime(qint64 timestampMs) {
   return timestampMs > 0
@@ -107,6 +110,18 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   }
   ready_ = true;
   refreshRoots();
+  if (database_.roots().isEmpty() &&
+      !QSettings().value(QStringLiteral("ui/firstUseHintShown"), false).toBool()) {
+    QTimer::singleShot(500, this, [this]() {
+      QSettings settings;
+      if (settings.value(QStringLiteral("ui/firstUseHintShown"), false).toBool()) return;
+      settings.setValue(QStringLiteral("ui/firstUseHintShown"), true);
+      QMessageBox::information(
+          this, QStringLiteral("欢迎使用文搜搜"),
+          QStringLiteral("首次使用请先点击首页右上角的“添加索引目录”，选择需要检索的文件夹。\n\n"
+                         "文搜搜会在本地建立全文索引，完成后即可在搜索框中输入关键词检索文档。"));
+    });
+  }
 
   registerSearchMetaTypes();
   searchWorker_ = new SearchWorker;
@@ -206,8 +221,11 @@ void MainWindow::setupUi() {
   directoryHeader->addWidget(searchTitle);
   directoryHeader->addStretch();
 
+  auto* addRootButton = new QPushButton(QStringLiteral("添加索引目录"), this);
+  addRootButton->setObjectName(QStringLiteral("primaryButton"));
   auto* managerButton = new QPushButton(QStringLiteral("索引管理"), this);
   auto* settingsButton = new QPushButton(QStringLiteral("设置"), this);
+  directoryHeader->addWidget(addRootButton);
   for (QPushButton* button : {managerButton, settingsButton}) {
     button->setObjectName(QStringLiteral("quietButton"));
     directoryHeader->addWidget(button);
@@ -237,11 +255,6 @@ void MainWindow::setupUi() {
   filterRow->addWidget(filterLabel);
   rootFilter_ = new QComboBox(this);
   rootFilter_->setObjectName(QStringLiteral("filterCombo"));
-  extensionFilterButton_ = new QPushButton(this);
-  extensionFilterButton_->setObjectName(QStringLiteral("filterButton"));
-  extensionFilterMenu_ = new QMenu(extensionFilterButton_);
-  extensionFilterButton_->setMenu(extensionFilterMenu_);
-  rebuildTypeFilterMenu();
   modifiedFilter_ = new QComboBox(this);
   modifiedFilter_->setObjectName(QStringLiteral("filterCombo"));
   modifiedFilter_->addItem(QStringLiteral("全部日期"), 0);
@@ -250,8 +263,13 @@ void MainWindow::setupUi() {
   modifiedFilter_->addItem(QStringLiteral("最近 30 天"), 30);
   modifiedFilter_->addItem(QStringLiteral("最近一年"), 365);
   filterRow->addWidget(rootFilter_);
-  filterRow->addWidget(extensionFilterButton_);
   filterRow->addWidget(modifiedFilter_);
+  extensionFilterWidget_ = new QWidget(this);
+  extensionFilterLayout_ = new QHBoxLayout(extensionFilterWidget_);
+  extensionFilterLayout_->setContentsMargins(6, 0, 0, 0);
+  extensionFilterLayout_->setSpacing(8);
+  rebuildTypeFilterMenu();
+  filterRow->addWidget(extensionFilterWidget_, 1);
   filterRow->addStretch();
   controlLayout->addWidget(filterBar);
   layout->addWidget(searchPanel_);
@@ -344,6 +362,7 @@ void MainWindow::setupUi() {
           this, &MainWindow::searchFirstPage);
   connect(modifiedFilter_, qOverload<int>(&QComboBox::currentIndexChanged),
           this, &MainWindow::searchFirstPage);
+  connect(addRootButton, &QPushButton::clicked, this, &MainWindow::addIndexRoot);
   connect(managerButton, &QPushButton::clicked, this, &MainWindow::showIndexManager);
   connect(settingsButton, &QPushButton::clicked, this, &MainWindow::showSettings);
   connect(collapseButton_, &QPushButton::clicked, this, &MainWindow::toggleSearchPanel);
@@ -355,6 +374,9 @@ void MainWindow::setupUi() {
           this, &MainWindow::changePageSize);
   connect(resultsTable_, &QTableWidget::cellDoubleClicked,
           this, &MainWindow::openSelectedDocument);
+  resultsTable_->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(resultsTable_, &QTableWidget::customContextMenuRequested,
+          this, &MainWindow::showResultContextMenu);
 }
 
 void MainWindow::updateAllRoots() {
@@ -377,11 +399,33 @@ void MainWindow::cancelIndexing() {
   if (indexWorker_) indexWorker_->cancel();
 }
 
+void MainWindow::addIndexRoot() {
+  const QString path = QFileDialog::getExistingDirectory(this, QStringLiteral("选择索引目录"));
+  if (path.isEmpty()) return;
+  if (QMessageBox::question(this, QStringLiteral("确认建立索引"),
+                            QStringLiteral("是否确认对以下目录建立索引？\n\n%1").arg(path)) !=
+      QMessageBox::Yes) {
+    return;
+  }
+  QString error;
+  if (!database_.addRoot(path, &error)) {
+    QMessageBox::warning(this, QStringLiteral("无法添加目录"), error);
+    return;
+  }
+  refreshRoots();
+  updateAllRoots();
+}
+
 void MainWindow::showSettings() {
+  const int oldResultLimit = configuredSearchResultLimit();
   SettingsDialog dialog(this);
   if (dialog.exec() == QDialog::Accepted) {
     rebuildTypeFilterMenu();
-    applyResultFilters();
+    if (oldResultLimit != configuredSearchResultLimit() && !lastSearchQuery_.isEmpty()) {
+      searchFirstPage();
+    } else {
+      applyResultFilters();
+    }
   }
 }
 
@@ -500,11 +544,14 @@ void MainWindow::runSearch() {
     statusLabel_->setText(QStringLiteral("准备就绪"));
     return;
   }
-  if (selectedTypeFilters().isEmpty()) {
+  const QStringList selectedTypes = selectedTypeFilters();
+  if (selectedTypes.isEmpty()) {
     QMessageBox::warning(this, QStringLiteral("文件类型筛选"),
                          QStringLiteral("搜索前至少需要选择一种文件类型。"));
     return;
   }
+  const int resultLimit = configuredSearchResultLimit();
+  lastSearchLimit_ = resultLimit;
   const int modifiedWithinDays = modifiedFilter_->currentData().toInt();
   const qint64 modifiedAfterMs =
       modifiedWithinDays > 0
@@ -520,10 +567,11 @@ void MainWindow::runSearch() {
       searchWorker_, "search", Qt::QueuedConnection,
       Q_ARG(qint64, requestId), Q_ARG(QString, query),
       Q_ARG(qint64, rootFilter_->currentData().toLongLong()),
-      Q_ARG(QString, QString()),
+      Q_ARG(QStringList, selectedTypes),
       Q_ARG(qint64, modifiedAfterMs), Q_ARG(SearchSort, searchSort_),
-      Q_ARG(int, kMaxCachedSearchResults),
-      Q_ARG(int, 0));
+      Q_ARG(int, resultLimit),
+      Q_ARG(int, 0),
+      Q_ARG(bool, false));
 }
 
 void MainWindow::handleSearchFinished(qint64 requestId,
@@ -544,11 +592,11 @@ void MainWindow::handleSearchFinished(qint64 requestId,
   lastSearchQuery_ = searchEdit_->text().trimmed();
   lastSearchElapsedMs_ = elapsedMs;
   applyResultFilters();
-  if (totalCount > kMaxCachedSearchResults) {
+  if (lastSearchLimit_ > 0 && totalCount >= lastSearchLimit_) {
     resultHintLabel_->setText(
-        QStringLiteral("当前关键词：%1，命中较多，仅缓存前 %2 条用于快速筛选，耗时 %3 秒")
+        QStringLiteral("当前关键词：%1，按设置最多保留 %2 条，耗时 %3 秒")
             .arg(lastSearchQuery_)
-            .arg(kMaxCachedSearchResults)
+            .arg(lastSearchLimit_)
             .arg(elapsedMs / 1000.0, 0, 'f', 2));
   }
 }
@@ -589,6 +637,7 @@ void MainWindow::renderCurrentPage() {
     highlightedFilename->setFont(resultsTable_->font());
     highlightedFilename->setMargin(10);
     highlightedFilename->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    highlightedFilename->setAttribute(Qt::WA_TransparentForMouseEvents);
     resultsTable_->setCellWidget(row, 0, highlightedFilename);
     resultsTable_->setItem(row, 1, new QTableWidgetItem(formatFileSize(result.size)));
     auto* snippet = new QLabel(this);
@@ -599,6 +648,7 @@ void MainWindow::renderCurrentPage() {
     snippet->setMargin(10);
     snippet->setWordWrap(true);
     snippet->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    snippet->setAttribute(Qt::WA_TransparentForMouseEvents);
     resultsTable_->setCellWidget(row, 2, snippet);
     resultsTable_->setItem(row, 3, new QTableWidgetItem(formatTime(result.mtimeMs)));
 
@@ -632,6 +682,12 @@ void MainWindow::renderCurrentPage() {
             [this, result]() { openDocument(result.path); });
     connect(folderButton, &QToolButton::clicked, this,
             [this, result]() { openContainingFolder(result.path); });
+    actions->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(actions, &QWidget::customContextMenuRequested, this,
+            [this, row, actions](const QPoint& position) {
+              showResultContextMenu(resultsTable_->viewport()->mapFromGlobal(
+                  actions->mapToGlobal(position)));
+            });
     resultsTable_->setCellWidget(row, 4, actions);
   }
   updatePagination();
@@ -644,12 +700,19 @@ void MainWindow::renderCurrentPage() {
                                              .arg(totalCount));
   resultHintLabel_->setText(lastSearchQuery_.isEmpty()
                                 ? QStringLiteral("输入关键词后开始检索")
-                                : QStringLiteral("当前关键词：%1，耗时 %2 秒")
-                                      .arg(lastSearchQuery_)
-                                      .arg(lastSearchElapsedMs_ / 1000.0, 0, 'f', 2));
-  statusLabel_->setText(QStringLiteral("找到 %1 个文件，耗时 %2 秒。")
-                            .arg(totalCount)
-                            .arg(lastSearchElapsedMs_ / 1000.0, 0, 'f', 2));
+                                : lastSearchLimit_ > 0
+                                      ? QStringLiteral("当前关键词：%1，最多保留 %2 条，耗时 %3 秒")
+                                            .arg(lastSearchQuery_)
+                                            .arg(lastSearchLimit_)
+                                            .arg(lastSearchElapsedMs_ / 1000.0, 0, 'f', 2)
+                                      : QStringLiteral("当前关键词：%1，不限制结果条数，耗时 %2 秒")
+                                            .arg(lastSearchQuery_)
+                                            .arg(lastSearchElapsedMs_ / 1000.0, 0, 'f', 2));
+  statusLabel_->setText(lastSearchQuery_.isEmpty()
+                            ? QStringLiteral("准备就绪")
+                            : QStringLiteral("找到 %1 个文件，耗时 %2 秒。")
+                                  .arg(totalCount)
+                                  .arg(lastSearchElapsedMs_ / 1000.0, 0, 'f', 2));
 }
 
 void MainWindow::updatePagination() {
@@ -681,69 +744,116 @@ void MainWindow::updatePagination() {
 }
 
 void MainWindow::rebuildTypeFilterMenu() {
-  if (!extensionFilterMenu_) return;
-  extensionFilterMenu_->clear();
-  extensionActions_.clear();
+  if (!extensionFilterLayout_) return;
+  while (QLayoutItem* item = extensionFilterLayout_->takeAt(0)) {
+    if (item->widget()) item->widget()->deleteLater();
+    delete item;
+  }
+  extensionChecks_.clear();
 
-  auto* selectAll = extensionFilterMenu_->addAction(QStringLiteral("全选"));
-  auto* clearAll = extensionFilterMenu_->addAction(QStringLiteral("全不选"));
-  connect(selectAll, &QAction::triggered, this, [this]() { setAllTypeFilters(true); });
-  connect(clearAll, &QAction::triggered, this, [this]() { setAllTypeFilters(false); });
-  extensionFilterMenu_->addSeparator();
+  auto* typeLabel = new QLabel(QStringLiteral("文件类型"), this);
+  typeLabel->setObjectName(QStringLiteral("sectionLabel"));
+  extensionFilterLayout_->addWidget(typeLabel);
+
+  auto* selectAll = new QPushButton(QStringLiteral("全选"), this);
+  auto* clearAll = new QPushButton(QStringLiteral("全不选"), this);
+  auto* invert = new QPushButton(QStringLiteral("反选"), this);
+  for (QPushButton* button : {selectAll, clearAll, invert}) {
+    button->setObjectName(QStringLiteral("quietButton"));
+    button->setMinimumHeight(30);
+    extensionFilterLayout_->addWidget(button);
+  }
+  connect(selectAll, &QPushButton::clicked, this, [this]() { setAllTypeFilters(true); });
+  connect(clearAll, &QPushButton::clicked, this, [this]() { setAllTypeFilters(false); });
+  connect(invert, &QPushButton::clicked, this, &MainWindow::invertTypeFilters);
 
   for (const QString& extension : RootPolicy::enabledExtensions()) {
-    auto* action = extensionFilterMenu_->addAction(extension.toUpper());
-    action->setCheckable(true);
-    action->setChecked(true);
-    action->setData(extension);
-    extensionActions_.append(action);
-    connect(action, &QAction::triggered, this, [this]() {
-      if (selectedTypeFilters().isEmpty()) {
-        if (auto* action = qobject_cast<QAction*>(sender())) action->setChecked(true);
-        QMessageBox::warning(this, QStringLiteral("文件类型筛选"),
-                             QStringLiteral("搜索前至少需要选择一种文件类型。"));
-        return;
-      }
-      extensionFilterButton_->setText(
-          QStringLiteral("类型 %1/%2")
-              .arg(selectedTypeFilters().size())
-              .arg(extensionActions_.size()));
+    auto* check = new QCheckBox(extension.toUpper(), this);
+    check->setProperty("extension", extension);
+    check->setChecked(true);
+    extensionChecks_.append(check);
+    extensionFilterLayout_->addWidget(check);
+    connect(check, &QCheckBox::toggled, this, [this]() {
       applyResultFilters();
     });
   }
-  extensionFilterButton_->setText(
-      QStringLiteral("类型 %1/%2")
-          .arg(selectedTypeFilters().size())
-          .arg(extensionActions_.size()));
+  extensionFilterLayout_->addStretch();
 }
 
 void MainWindow::setAllTypeFilters(bool checked) {
-  if (!checked && extensionActions_.size() <= 1) {
-    QMessageBox::warning(this, QStringLiteral("文件类型筛选"),
-                         QStringLiteral("至少需要选择一种文件类型。"));
-    return;
+  for (QCheckBox* check : extensionChecks_) {
+    check->blockSignals(true);
+    check->setChecked(checked);
+    check->blockSignals(false);
   }
-  for (QAction* action : extensionActions_) action->setChecked(checked);
-  if (selectedTypeFilters().isEmpty() && !extensionActions_.isEmpty()) {
-    extensionActions_.first()->setChecked(true);
+  applyResultFilters();
+}
+
+void MainWindow::invertTypeFilters() {
+  for (QCheckBox* check : extensionChecks_) {
+    check->blockSignals(true);
+    check->setChecked(!check->isChecked());
+    check->blockSignals(false);
   }
-  extensionFilterButton_->setText(
-      QStringLiteral("类型 %1/%2")
-          .arg(selectedTypeFilters().size())
-          .arg(extensionActions_.size()));
   applyResultFilters();
 }
 
 QStringList MainWindow::selectedTypeFilters() const {
   QStringList extensions;
-  for (QAction* action : extensionActions_) {
-    if (action->isChecked()) extensions.append(action->data().toString());
+  for (QCheckBox* check : extensionChecks_) {
+    if (check->isChecked()) extensions.append(check->property("extension").toString());
   }
   return extensions;
 }
 
 bool MainWindow::resultPassesTypeFilter(const SearchResult& result) const {
   return selectedTypeFilters().contains(result.extension, Qt::CaseInsensitive);
+}
+
+int MainWindow::configuredSearchResultLimit() const {
+  return QSettings().value(QStringLiteral("search/resultLimit"), 0).toInt();
+}
+
+bool MainWindow::resultForRow(int row, SearchResult* result) const {
+  const int index = page_ * pageSize_ + row;
+  if (row < 0 || index < 0 || index >= filteredSearchResults_.size()) {
+    return false;
+  }
+  if (result) *result = filteredSearchResults_.at(index);
+  return true;
+}
+
+void MainWindow::showResultContextMenu(const QPoint& position) {
+  const int row = resultsTable_->rowAt(position.y());
+  SearchResult result;
+  if (!resultForRow(row, &result)) return;
+  resultsTable_->selectRow(row);
+
+  QMenu menu(this);
+  QAction* preview = menu.addAction(QStringLiteral("预览"));
+  QAction* open = menu.addAction(QStringLiteral("打开"));
+  QAction* openFolder = menu.addAction(QStringLiteral("打开文件夹"));
+  menu.addSeparator();
+  QAction* copyName = menu.addAction(QStringLiteral("复制文件名"));
+  QAction* copyPath = menu.addAction(QStringLiteral("复制文件完整路径"));
+  menu.addSeparator();
+  QAction* removeFile = menu.addAction(QStringLiteral("删除文件"));
+
+  QAction* selected = menu.exec(resultsTable_->viewport()->mapToGlobal(position));
+  if (!selected) return;
+  if (selected == preview) {
+    showDocumentPreview(result.id, result.filename, result.path);
+  } else if (selected == open) {
+    openDocument(result.path);
+  } else if (selected == openFolder) {
+    openContainingFolder(result.path);
+  } else if (selected == copyName) {
+    copyTextToClipboard(result.filename);
+  } else if (selected == copyPath) {
+    copyTextToClipboard(result.path);
+  } else if (selected == removeFile) {
+    deleteDocumentFile(result);
+  }
 }
 
 void MainWindow::showDocumentPreview(qint64 documentId, const QString& filename,
@@ -842,6 +952,51 @@ void MainWindow::openContainingFolder(const QString& path) {
   if (!path.isEmpty()) {
     QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
   }
+}
+
+void MainWindow::copyTextToClipboard(const QString& text) {
+  QApplication::clipboard()->setText(text);
+  statusLabel_->setText(QStringLiteral("已复制到剪贴板。"));
+}
+
+void MainWindow::deleteDocumentFile(const SearchResult& result) {
+  if (result.path.isEmpty()) return;
+  const QFileInfo info(result.path);
+  const bool exists = info.exists();
+  const QString message =
+      exists
+          ? QStringLiteral("确定要删除以下文件吗？\n\n%1\n\n"
+                           "文搜搜会优先尝试移入回收站，并同步移除索引记录。")
+                .arg(result.path)
+          : QStringLiteral("文件已不存在，是否仅从索引中移除此记录？\n\n%1")
+                .arg(result.path);
+  if (QMessageBox::question(this, QStringLiteral("删除文件"), message) !=
+      QMessageBox::Yes) {
+    return;
+  }
+
+  if (exists) {
+    bool removed = QFile::moveToTrash(result.path);
+    if (!removed) removed = QFile::remove(result.path);
+    if (!removed) {
+      QMessageBox::warning(this, QStringLiteral("删除失败"),
+                           QStringLiteral("无法删除文件：%1").arg(result.path));
+      return;
+    }
+  }
+
+  QString error;
+  if (!database_.removeDocument(result.id, &error)) {
+    QMessageBox::warning(this, QStringLiteral("索引更新失败"),
+                         QStringLiteral("文件已删除，但移除索引失败：%1").arg(error));
+  }
+  for (int index = cachedSearchResults_.size() - 1; index >= 0; --index) {
+    if (cachedSearchResults_.at(index).id == result.id) {
+      cachedSearchResults_.removeAt(index);
+    }
+  }
+  applyResultFilters();
+  statusLabel_->setText(QStringLiteral("已删除：%1").arg(result.filename));
 }
 
 void MainWindow::handleIndexRunning(bool running) {

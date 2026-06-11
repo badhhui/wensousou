@@ -21,8 +21,8 @@ class SearchWorker : public QObject {
  public slots:
   void initialize();
   void search(qint64 requestId, const QString& query, qint64 rootId,
-              const QString& extension, qint64 modifiedAfterMs,
-              SearchSort sort, int limit, int offset);
+              const QStringList& extensions, qint64 modifiedAfterMs,
+              SearchSort sort, int limit, int offset, bool countTotal);
 
  signals:
   void finished(qint64 requestId, const QList<SearchResult>& results,

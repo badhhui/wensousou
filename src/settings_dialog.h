@@ -23,6 +23,7 @@ class SettingsDialog : public QDialog {
   QSpinBox* maxCharactersWan_ = nullptr;
   QSpinBox* timeoutSeconds_ = nullptr;
   QComboBox* fontScale_ = nullptr;
+  QComboBox* resultLimit_ = nullptr;
   QCheckBox* startupUpdate_ = nullptr;
   QList<QCheckBox*> extensionChecks_;
 };
