@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
 
   QCoreApplication::setOrganizationName(QStringLiteral("WenSouSou"));
   QCoreApplication::setApplicationName(QStringLiteral("wensousou"));
-  QCoreApplication::setApplicationVersion(QStringLiteral("1.1.2"));
+  QCoreApplication::setApplicationVersion(QStringLiteral("1.1.3"));
   wensousou::initializeLogging();
 
   bool selfCheck = false;
