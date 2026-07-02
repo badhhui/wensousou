@@ -65,6 +65,9 @@ class MainWindow : public QMainWindow {
   void invertTypeFilters();
   QStringList selectedTypeFilters() const;
   bool resultPassesTypeFilter(const SearchResult& result) const;
+  bool searchesFilenames() const;
+  bool searchesContents() const;
+  int selectedSearchScope() const;
   int configuredSearchResultLimit() const;
   bool resultForRow(int row, SearchResult* result) const;
   void showDocumentPreview(qint64 documentId, const QString& filename,
@@ -85,6 +88,8 @@ class MainWindow : public QMainWindow {
   QFrame* searchPanel_ = nullptr;
   QLineEdit* searchEdit_ = nullptr;
   QComboBox* rootFilter_ = nullptr;
+  QCheckBox* searchFilenameCheck_ = nullptr;
+  QCheckBox* searchContentCheck_ = nullptr;
   QWidget* extensionFilterWidget_ = nullptr;
   QHBoxLayout* extensionFilterLayout_ = nullptr;
   QList<QCheckBox*> extensionChecks_;

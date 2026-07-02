@@ -31,7 +31,8 @@ void SearchMetaTypeTest::invokesSearchWithSortMode() {
       Q_ARG(qint64, 1), Q_ARG(QString, QStringLiteral("党费")),
       Q_ARG(qint64, 0), Q_ARG(QStringList, QStringList()),
       Q_ARG(qint64, 0), Q_ARG(SearchSort, SearchSort::Relevance),
-      Q_ARG(int, 20), Q_ARG(int, 0), Q_ARG(bool, false)));
+      Q_ARG(int, 20), Q_ARG(int, 0), Q_ARG(bool, false),
+      Q_ARG(int, 0x3)));
   QCOMPARE(finished.count(), 1);
 }
 

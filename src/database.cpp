@@ -69,6 +69,15 @@ QString buildFtsQuery(const QString& query) {
   return terms.join(QStringLiteral(" AND "));
 }
 
+QString applySearchScope(const QString& ftsQuery, bool searchFilenames,
+                         bool searchContents) {
+  if (ftsQuery.isEmpty() || (!searchFilenames && !searchContents)) return QString();
+  if (searchFilenames && searchContents) return ftsQuery;
+  return QStringLiteral("%1 : (%2)")
+      .arg(searchFilenames ? QStringLiteral("filename") : QStringLiteral("content"),
+           ftsQuery);
+}
+
 }  // namespace
 
 Database::Database() = default;
@@ -590,9 +599,12 @@ QList<SearchResult> Database::search(const QString& query, qint64 rootId,
                                      const QStringList& extensions,
                                      qint64 modifiedAfterMs, SearchSort sort,
                                      int limit, int offset, QString* error,
-                                     int* totalCount, bool countTotal) const {
+                                     int* totalCount, bool countTotal,
+                                     bool searchFilenames,
+                                     bool searchContents) const {
   QList<SearchResult> results;
-  const QString ftsQuery = buildFtsQuery(query);
+  const QString ftsQuery =
+      applySearchScope(buildFtsQuery(query), searchFilenames, searchContents);
   if (totalCount) *totalCount = 0;
   if (ftsQuery.isEmpty()) return results;
   QStringList normalizedExtensions;

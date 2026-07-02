@@ -112,7 +112,9 @@ class Database {
   QList<SearchResult> search(const QString& query, qint64 rootId,
                              const QStringList& extensions, qint64 modifiedAfterMs,
                              SearchSort sort, int limit, int offset, QString* error,
-                             int* totalCount = nullptr, bool countTotal = true) const;
+                             int* totalCount = nullptr, bool countTotal = true,
+                             bool searchFilenames = true,
+                             bool searchContents = true) const;
   bool removeDocument(qint64 documentId, QString* error);
   bool warmUpSearch(QString* error) const;
   QString previewDocument(qint64 documentId, const QString& query,

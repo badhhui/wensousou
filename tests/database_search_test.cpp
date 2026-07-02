@@ -15,6 +15,7 @@ class DatabaseSearchTest : public QObject {
   void findsNormalizedChineseContent();
   void returnsTotalCountAndNewestDocumentsFirst();
   void filtersExtensionsAndCanSkipExactCount();
+  void filtersBySearchScope();
   void reportsRootSummaryAndFailures();
   void clearsDocumentsFromOlderSchema();
 };
@@ -128,6 +129,44 @@ void DatabaseSearchTest::filtersExtensionsAndCanSkipExactCount() {
   QCOMPARE(totalCount, 1);
   QCOMPARE(limited.size(), 1);
   QCOMPARE(limited.first().filename, QStringLiteral("c.xlsx"));
+  QVERIFY2(error.isEmpty(), qPrintable(error));
+}
+
+void DatabaseSearchTest::filtersBySearchScope() {
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+
+  Database database;
+  QString error;
+  QVERIFY2(database.open(temporary.filePath(QStringLiteral("index.db")),
+                         QStringLiteral(WENSOUSOU_TEST_SIMPLE_LIB), &error),
+           qPrintable(error));
+  QVERIFY2(database.addRoot(temporary.path(), &error), qPrintable(error));
+  const RootRecord root = database.roots(&error).first();
+  const qint64 scanId = database.beginScan(root.id, &error);
+  QVERIFY2(scanId > 0, qPrintable(error));
+  QVERIFY2(database.upsertDocument(root.id, temporary.filePath(QStringLiteral("contract.doc")),
+                                   10, 1000, QStringLiteral("普通正文"), scanId, &error),
+           qPrintable(error));
+  QVERIFY2(database.upsertDocument(root.id, temporary.filePath(QStringLiteral("plain.doc")),
+                                   10, 2000, QStringLiteral("contract body"), scanId, &error),
+           qPrintable(error));
+  QVERIFY2(database.finishScan(scanId, root.id, true, QString(), &error),
+           qPrintable(error));
+
+  const QList<SearchResult> filenameOnly =
+      database.search(QStringLiteral("contract"), 0, QStringList(), 0,
+                      SearchSort::ModifiedDescending, 10, 0, &error, nullptr,
+                      true, true, false);
+  QCOMPARE(filenameOnly.size(), 1);
+  QCOMPARE(filenameOnly.first().filename, QStringLiteral("contract.doc"));
+
+  const QList<SearchResult> contentOnly =
+      database.search(QStringLiteral("contract"), 0, QStringList(), 0,
+                      SearchSort::ModifiedDescending, 10, 0, &error, nullptr,
+                      true, false, true);
+  QCOMPARE(contentOnly.size(), 1);
+  QCOMPARE(contentOnly.first().filename, QStringLiteral("plain.doc"));
   QVERIFY2(error.isEmpty(), qPrintable(error));
 }
 

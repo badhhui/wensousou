@@ -264,6 +264,15 @@ void MainWindow::setupUi() {
   modifiedFilter_->addItem(QStringLiteral("最近一年"), 365);
   filterRow->addWidget(rootFilter_);
   filterRow->addWidget(modifiedFilter_);
+  auto* scopeLabel = new QLabel(QStringLiteral("搜索范围"), this);
+  scopeLabel->setObjectName(QStringLiteral("sectionLabel"));
+  searchFilenameCheck_ = new QCheckBox(QStringLiteral("文件名"), this);
+  searchFilenameCheck_->setChecked(true);
+  searchContentCheck_ = new QCheckBox(QStringLiteral("文件内容"), this);
+  searchContentCheck_->setChecked(true);
+  filterRow->addWidget(scopeLabel);
+  filterRow->addWidget(searchFilenameCheck_);
+  filterRow->addWidget(searchContentCheck_);
   extensionFilterWidget_ = new QWidget(this);
   extensionFilterLayout_ = new QHBoxLayout(extensionFilterWidget_);
   extensionFilterLayout_->setContentsMargins(6, 0, 0, 0);
@@ -362,6 +371,14 @@ void MainWindow::setupUi() {
           this, &MainWindow::searchFirstPage);
   connect(modifiedFilter_, qOverload<int>(&QComboBox::currentIndexChanged),
           this, &MainWindow::searchFirstPage);
+  const auto rerunSearchOnScopeChange = [this]() {
+    if (!searchEdit_->text().trimmed().isEmpty() &&
+        (searchesFilenames() || searchesContents())) {
+      searchFirstPage();
+    }
+  };
+  connect(searchFilenameCheck_, &QCheckBox::toggled, this, rerunSearchOnScopeChange);
+  connect(searchContentCheck_, &QCheckBox::toggled, this, rerunSearchOnScopeChange);
   connect(addRootButton, &QPushButton::clicked, this, &MainWindow::addIndexRoot);
   connect(managerButton, &QPushButton::clicked, this, &MainWindow::showIndexManager);
   connect(settingsButton, &QPushButton::clicked, this, &MainWindow::showSettings);
@@ -550,6 +567,11 @@ void MainWindow::runSearch() {
                          QStringLiteral("搜索前至少需要选择一种文件类型。"));
     return;
   }
+  if (!searchesFilenames() && !searchesContents()) {
+    QMessageBox::warning(this, QStringLiteral("搜索范围"),
+                         QStringLiteral("搜索前至少需要选择文件名或文件内容。"));
+    return;
+  }
   const int resultLimit = configuredSearchResultLimit();
   lastSearchLimit_ = resultLimit;
   const int modifiedWithinDays = modifiedFilter_->currentData().toInt();
@@ -571,7 +593,8 @@ void MainWindow::runSearch() {
       Q_ARG(qint64, modifiedAfterMs), Q_ARG(SearchSort, searchSort_),
       Q_ARG(int, resultLimit),
       Q_ARG(int, 0),
-      Q_ARG(bool, false));
+      Q_ARG(bool, false),
+      Q_ARG(int, selectedSearchScope()));
 }
 
 void MainWindow::handleSearchFinished(qint64 requestId,
@@ -808,6 +831,21 @@ QStringList MainWindow::selectedTypeFilters() const {
 
 bool MainWindow::resultPassesTypeFilter(const SearchResult& result) const {
   return selectedTypeFilters().contains(result.extension, Qt::CaseInsensitive);
+}
+
+bool MainWindow::searchesFilenames() const {
+  return searchFilenameCheck_ && searchFilenameCheck_->isChecked();
+}
+
+bool MainWindow::searchesContents() const {
+  return searchContentCheck_ && searchContentCheck_->isChecked();
+}
+
+int MainWindow::selectedSearchScope() const {
+  int scope = 0;
+  if (searchesFilenames()) scope |= 0x1;
+  if (searchesContents()) scope |= 0x2;
+  return scope;
 }
 
 int MainWindow::configuredSearchResultLimit() const {
