@@ -22,6 +22,19 @@ class RootPolicyTest : public QObject {
     QVERIFY(RootPolicy::overlaps(parent, child));
   }
 
+  void allowsExplicitHiddenSubtreeRoots() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const QString parent = temporary.path();
+    const QString hidden = QDir(parent).filePath(QStringLiteral(".private"));
+    QVERIFY(QDir().mkpath(hidden));
+
+    QString error;
+    QVERIFY2(RootPolicy::canAdd(hidden, {parent}, &error), qPrintable(error));
+    error.clear();
+    QVERIFY2(RootPolicy::canAdd(parent, {hidden}, &error), qPrintable(error));
+  }
+
   void supportsRequestedExtensions() {
     QVERIFY(RootPolicy::isSupportedDocument(QStringLiteral("/tmp/report.wps")));
     QVERIFY(RootPolicy::isSupportedDocument(QStringLiteral("/tmp/table.ET")));
@@ -41,4 +54,3 @@ class RootPolicyTest : public QObject {
 
 QTEST_GUILESS_MAIN(RootPolicyTest)
 #include "root_policy_test.moc"
-

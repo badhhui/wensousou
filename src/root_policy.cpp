@@ -14,6 +14,22 @@ bool hasPathPrefix(const QString& child, const QString& parent) {
   return child.startsWith(parent + QDir::separator());
 }
 
+bool hasHiddenPathSegmentBelow(const QString& descendant, const QString& ancestor) {
+  if (!hasPathPrefix(descendant, ancestor) || descendant == ancestor) return false;
+  const QString relative = QDir::fromNativeSeparators(
+      QDir(ancestor).relativeFilePath(descendant));
+  const QStringList parts = relative.split(QLatin1Char('/'), Qt::SkipEmptyParts);
+  for (const QString& part : parts) {
+    if (part.startsWith(QLatin1Char('.'))) return true;
+  }
+  return false;
+}
+
+bool overlapIsSkippedHiddenSubtree(const QString& left, const QString& right) {
+  return hasHiddenPathSegmentBelow(left, right) ||
+         hasHiddenPathSegmentBelow(right, left);
+}
+
 }  // namespace
 
 QStringList RootPolicy::availableExtensions() {
@@ -69,7 +85,9 @@ bool RootPolicy::canAdd(const QString& candidate, const QStringList& existing,
   }
   const QString normalized = normalize(candidate);
   for (const QString& root : existing) {
-    if (overlaps(normalized, root)) {
+    const QString normalizedRoot = normalize(root);
+    if (overlaps(normalized, normalizedRoot) &&
+        !overlapIsSkippedHiddenSubtree(normalized, normalizedRoot)) {
       if (error) {
         *error = QStringLiteral("所选目录与已有目录重叠：%1").arg(root);
       }
