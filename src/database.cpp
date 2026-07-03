@@ -703,8 +703,8 @@ QList<SearchResult> Database::search(const QString& query, qint64 rootId,
   }
   if (totalCount && !countTotal) *totalCount = results.size();
   Statement snippet(db_, QStringLiteral(
-      "SELECT highlight(documents_fts,0,'【','】'),"
-      "simple_snippet(documents_fts,1,'【','】','...',40) "
+      "SELECT highlight(documents_fts,0,'__WSS_HIT_START__','__WSS_HIT_END__'),"
+      "simple_snippet(documents_fts,1,'__WSS_HIT_START__','__WSS_HIT_END__','...',40) "
       "FROM documents_fts WHERE rowid=? AND documents_fts MATCH ?;"),
                     error);
   if (!snippet.valid()) return results;

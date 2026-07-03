@@ -48,6 +48,8 @@ namespace wensousou {
 namespace {
 
 constexpr int kPreviewCharacterLimit = 1'000'000;
+const QString kResultHighlightStart = QStringLiteral("__WSS_HIT_START__");
+const QString kResultHighlightEnd = QStringLiteral("__WSS_HIT_END__");
 
 QString formatTime(qint64 timestampMs) {
   return timestampMs > 0
@@ -655,7 +657,7 @@ void MainWindow::renderCurrentPage() {
         highlightedHtml(result.highlightedFilename.isEmpty()
                             ? result.filename
                             : result.highlightedFilename,
-                        QStringLiteral("【"), QStringLiteral("】")));
+                        kResultHighlightStart, kResultHighlightEnd));
     highlightedFilename->setToolTip(result.path);
     highlightedFilename->setFont(resultsTable_->font());
     highlightedFilename->setMargin(10);
@@ -665,8 +667,8 @@ void MainWindow::renderCurrentPage() {
     resultsTable_->setItem(row, 1, new QTableWidgetItem(formatFileSize(result.size)));
     auto* snippet = new QLabel(this);
     snippet->setTextFormat(Qt::RichText);
-    snippet->setText(highlightedHtml(result.snippet, QStringLiteral("【"),
-                                     QStringLiteral("】")));
+    snippet->setText(highlightedHtml(result.snippet, kResultHighlightStart,
+                                     kResultHighlightEnd));
     snippet->setFont(resultsTable_->font());
     snippet->setMargin(10);
     snippet->setWordWrap(true);

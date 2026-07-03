@@ -13,6 +13,7 @@ class DatabaseSearchTest : public QObject {
 
  private slots:
   void findsNormalizedChineseContent();
+  void keepsLiteralChineseBracketsOutOfHighlightMarkers();
   void returnsTotalCountAndNewestDocumentsFirst();
   void filtersExtensionsAndCanSkipExactCount();
   void filtersBySearchScope();
@@ -48,7 +49,7 @@ void DatabaseSearchTest::findsNormalizedChineseContent() {
                       SearchSort::Relevance, 10, 0, &error);
   QCOMPARE(filenameMatch.size(), 1);
   QCOMPARE(filenameMatch.first().highlightedFilename,
-           QStringLiteral("【document】.txt"));
+           QStringLiteral("__WSS_HIT_START__document__WSS_HIT_END__.txt"));
   QCOMPARE(database.search(QStringLiteral("党费"), 0, QStringList(), 0, SearchSort::Relevance,
                            10, 0, &error).size(),
            1);
@@ -56,6 +57,37 @@ void DatabaseSearchTest::findsNormalizedChineseContent() {
                            SearchSort::Relevance, 10, 0, &error)
                .size(),
            1);
+  QVERIFY2(error.isEmpty(), qPrintable(error));
+}
+
+void DatabaseSearchTest::keepsLiteralChineseBracketsOutOfHighlightMarkers() {
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+
+  Database database;
+  QString error;
+  QVERIFY2(database.open(temporary.filePath(QStringLiteral("index.db")),
+                         QStringLiteral(WENSOUSOU_TEST_SIMPLE_LIB), &error),
+           qPrintable(error));
+  QVERIFY2(database.addRoot(temporary.path(), &error), qPrintable(error));
+  const RootRecord root = database.roots(&error).first();
+  const qint64 scanId = database.beginScan(root.id, &error);
+  QVERIFY2(scanId > 0, qPrintable(error));
+  QVERIFY2(database.upsertDocument(
+               root.id, temporary.filePath(QStringLiteral("brackets.doc")), 32, 1234,
+               QStringLiteral("【非关键词】 党费"), scanId, &error),
+           qPrintable(error));
+  QVERIFY2(database.finishScan(scanId, root.id, true, QString(), &error),
+           qPrintable(error));
+
+  const QList<SearchResult> results =
+      database.search(QStringLiteral("党费"), 0, QStringList(), 0,
+                      SearchSort::Relevance, 10, 0, &error);
+  QCOMPARE(results.size(), 1);
+  QVERIFY(results.first().snippet.contains(QStringLiteral("【非关键词】")));
+  QVERIFY(!results.first().snippet.contains(QStringLiteral("__WSS_HIT_START__非关键词")));
+  QVERIFY(results.first().snippet.contains(
+      QStringLiteral("__WSS_HIT_START__党费__WSS_HIT_END__")));
   QVERIFY2(error.isEmpty(), qPrintable(error));
 }
 
