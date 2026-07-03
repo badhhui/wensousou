@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
 
   QCoreApplication::setOrganizationName(QStringLiteral("WenSouSou"));
   QCoreApplication::setApplicationName(QStringLiteral("wensousou"));
-  QCoreApplication::setApplicationVersion(QStringLiteral("1.1.3"));
+  QCoreApplication::setApplicationVersion(QStringLiteral("1.1.4"));
   wensousou::initializeLogging();
 
   bool selfCheck = false;
@@ -78,8 +78,6 @@ int main(int argc, char* argv[]) {
   app.setFont(appFont);
   app.setStyleSheet(QStringLiteral(
       "QMainWindow, QDialog, QWidget#appShell { background: #f5f8ff; color: #172033; }"
-      "QFrame#brandMark { background: #3b82f6; border-radius: 9px; }"
-      "QLabel#brandGlyph { color: white; font-size: 25px; font-weight: 700; }"
       "QLabel#brandTitle { color: #172033; font-size: 26px; font-weight: 700; }"
       "QLabel#muted, QLabel#resultHint { color: #64748b; }"
       "QLabel#sectionLabel { color: #64748b; font-size: 14px; font-weight: 700; }"
@@ -116,6 +114,17 @@ int main(int argc, char* argv[]) {
       "  font-weight: 700; padding-left: 18px; padding-right: 18px; }"
       "QPushButton#primaryButton:hover { background: #2563eb; border-color: #2563eb; }"
       "QPushButton#quietButton { background: transparent; border-color: #dbe4ee; color: #475569; }"
+      "QWidget#searchHistoryBar { background: transparent; }"
+      "QWidget#historyChip { background: #eff6ff; border: 1px solid #bfdbfe;"
+      "  border-radius: 11px; }"
+      "QPushButton#historyKeywordButton { background: transparent; border: 0;"
+      "  color: #1d4ed8; padding: 2px 5px; }"
+      "QPushButton#historyKeywordButton:hover { background: transparent; border: 0;"
+      "  color: #1e40af; }"
+      "QToolButton#historyRemoveButton { background: transparent; border: 0;"
+      "  color: #64748b; padding: 0; }"
+      "QToolButton#historyRemoveButton:hover { background: #dbeafe; border: 0;"
+      "  color: #1d4ed8; }"
       "QPushButton#activePageButton { background: #dbeafe; border-color: #bfdbfe;"
       "  color: #1d4ed8; font-weight: 700; }"
       "QPushButton#activePageButton:disabled { background: #dbeafe; border-color: #bfdbfe;"

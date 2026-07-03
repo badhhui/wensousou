@@ -63,6 +63,12 @@ class MainWindow : public QMainWindow {
   void rebuildTypeFilterMenu();
   void setAllTypeFilters(bool checked);
   void invertTypeFilters();
+  void refreshSearchHistory();
+  void addSearchHistory(const QString& keyword);
+  void removeSearchHistory(const QString& keyword);
+  void saveSearchHistory(const QStringList& history) const;
+  QStringList searchHistory() const;
+  void searchFromHistory(const QString& keyword);
   QStringList selectedTypeFilters() const;
   bool resultPassesTypeFilter(const SearchResult& result) const;
   bool searchesFilenames() const;
@@ -87,6 +93,8 @@ class MainWindow : public QMainWindow {
 
   QFrame* searchPanel_ = nullptr;
   QLineEdit* searchEdit_ = nullptr;
+  QWidget* searchHistoryWidget_ = nullptr;
+  QHBoxLayout* searchHistoryLayout_ = nullptr;
   QComboBox* rootFilter_ = nullptr;
   QCheckBox* searchFilenameCheck_ = nullptr;
   QCheckBox* searchContentCheck_ = nullptr;

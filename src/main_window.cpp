@@ -48,6 +48,7 @@ namespace wensousou {
 namespace {
 
 constexpr int kPreviewCharacterLimit = 1'000'000;
+constexpr int kMaxSearchHistoryItems = 10;
 const QString kResultHighlightStart = QStringLiteral("__WSS_HIT_START__");
 const QString kResultHighlightEnd = QStringLiteral("__WSS_HIT_END__");
 
@@ -122,6 +123,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
           this, QStringLiteral("欢迎使用文搜搜"),
           QStringLiteral("首次使用请先点击首页右上角的“添加索引目录”，选择需要检索的文件夹。\n\n"
                          "文搜搜会在本地建立全文索引，完成后即可在搜索框中输入关键词检索文档。"));
+      if (searchEdit_) searchEdit_->setFocus(Qt::OtherFocusReason);
     });
   }
 
@@ -180,16 +182,6 @@ void MainWindow::setupUi() {
 
   auto* toolbar = new QHBoxLayout;
   toolbar->setSpacing(14);
-  auto* brandMark = new QFrame(this);
-  brandMark->setObjectName(QStringLiteral("brandMark"));
-  brandMark->setFixedSize(48, 48);
-  auto* brandMarkLayout = new QVBoxLayout(brandMark);
-  brandMarkLayout->setContentsMargins(0, 0, 0, 0);
-  auto* brandGlyph = new QLabel(QStringLiteral("文"), brandMark);
-  brandGlyph->setObjectName(QStringLiteral("brandGlyph"));
-  brandGlyph->setAlignment(Qt::AlignCenter);
-  brandMarkLayout->addWidget(brandGlyph);
-  toolbar->addWidget(brandMark);
 
   auto* brandCopy = new QVBoxLayout;
   brandCopy->setSpacing(2);
@@ -246,6 +238,14 @@ void MainWindow::setupUi() {
   searchRow->addWidget(searchEdit_, 1);
   searchRow->addWidget(searchButton_);
   controlLayout->addLayout(searchRow);
+
+  searchHistoryWidget_ = new QWidget(this);
+  searchHistoryWidget_->setObjectName(QStringLiteral("searchHistoryBar"));
+  searchHistoryLayout_ = new QHBoxLayout(searchHistoryWidget_);
+  searchHistoryLayout_->setContentsMargins(0, 0, 0, 0);
+  searchHistoryLayout_->setSpacing(8);
+  controlLayout->addWidget(searchHistoryWidget_);
+  refreshSearchHistory();
 
   auto* filterBar = new QFrame(this);
   filterBar->setObjectName(QStringLiteral("filterBar"));
@@ -396,6 +396,9 @@ void MainWindow::setupUi() {
   resultsTable_->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(resultsTable_, &QTableWidget::customContextMenuRequested,
           this, &MainWindow::showResultContextMenu);
+  QTimer::singleShot(0, searchEdit_, [this]() {
+    if (searchEdit_) searchEdit_->setFocus(Qt::OtherFocusReason);
+  });
 }
 
 void MainWindow::updateAllRoots() {
@@ -616,6 +619,7 @@ void MainWindow::handleSearchFinished(qint64 requestId,
   cachedSearchResults_ = results;
   lastSearchQuery_ = searchEdit_->text().trimmed();
   lastSearchElapsedMs_ = elapsedMs;
+  addSearchHistory(lastSearchQuery_);
   applyResultFilters();
   if (lastSearchLimit_ > 0 && totalCount >= lastSearchLimit_) {
     resultHintLabel_->setText(
@@ -624,6 +628,97 @@ void MainWindow::handleSearchFinished(qint64 requestId,
             .arg(lastSearchLimit_)
             .arg(elapsedMs / 1000.0, 0, 'f', 2));
   }
+}
+
+QStringList MainWindow::searchHistory() const {
+  const QStringList stored =
+      QSettings().value(QStringLiteral("search/history")).toStringList();
+  QStringList cleaned;
+  for (QString keyword : stored) {
+    keyword = keyword.trimmed();
+    if (keyword.isEmpty() || cleaned.contains(keyword, Qt::CaseSensitive)) continue;
+    cleaned.append(keyword);
+    if (cleaned.size() >= kMaxSearchHistoryItems) break;
+  }
+  return cleaned;
+}
+
+void MainWindow::saveSearchHistory(const QStringList& history) const {
+  QSettings().setValue(QStringLiteral("search/history"), history);
+}
+
+void MainWindow::refreshSearchHistory() {
+  if (!searchHistoryWidget_ || !searchHistoryLayout_) return;
+  while (QLayoutItem* item = searchHistoryLayout_->takeAt(0)) {
+    if (QWidget* widget = item->widget()) widget->deleteLater();
+    delete item;
+  }
+
+  const QStringList history = searchHistory();
+  searchHistoryWidget_->setVisible(!history.isEmpty());
+  if (history.isEmpty()) return;
+
+  auto* label = new QLabel(QStringLiteral("最近搜索"), searchHistoryWidget_);
+  label->setObjectName(QStringLiteral("sectionLabel"));
+  searchHistoryLayout_->addWidget(label);
+
+  for (const QString& keyword : history) {
+    auto* chip = new QWidget(searchHistoryWidget_);
+    chip->setObjectName(QStringLiteral("historyChip"));
+    auto* chipLayout = new QHBoxLayout(chip);
+    chipLayout->setContentsMargins(9, 2, 4, 2);
+    chipLayout->setSpacing(2);
+
+    auto* keywordButton = new QPushButton(keyword, chip);
+    keywordButton->setObjectName(QStringLiteral("historyKeywordButton"));
+    keywordButton->setToolTip(keyword);
+    keywordButton->setMaximumWidth(180);
+    keywordButton->setCursor(Qt::PointingHandCursor);
+    connect(keywordButton, &QPushButton::clicked, this,
+            [this, keyword]() { searchFromHistory(keyword); });
+
+    auto* removeButton = new QToolButton(chip);
+    removeButton->setObjectName(QStringLiteral("historyRemoveButton"));
+    removeButton->setText(QStringLiteral("x"));
+    removeButton->setFixedSize(18, 18);
+    removeButton->setCursor(Qt::PointingHandCursor);
+    removeButton->setToolTip(QStringLiteral("删除这条搜索历史"));
+    connect(removeButton, &QToolButton::clicked, this,
+            [this, keyword]() { removeSearchHistory(keyword); });
+
+    chipLayout->addWidget(keywordButton);
+    chipLayout->addWidget(removeButton, 0, Qt::AlignTop);
+    searchHistoryLayout_->addWidget(chip);
+  }
+  searchHistoryLayout_->addStretch();
+}
+
+void MainWindow::addSearchHistory(const QString& keyword) {
+  const QString normalized = keyword.trimmed();
+  if (normalized.isEmpty()) return;
+
+  QStringList history = searchHistory();
+  history.removeAll(normalized);
+  history.prepend(normalized);
+  while (history.size() > kMaxSearchHistoryItems) {
+    history.removeLast();
+  }
+  saveSearchHistory(history);
+  refreshSearchHistory();
+}
+
+void MainWindow::removeSearchHistory(const QString& keyword) {
+  QStringList history = searchHistory();
+  history.removeAll(keyword);
+  saveSearchHistory(history);
+  refreshSearchHistory();
+}
+
+void MainWindow::searchFromHistory(const QString& keyword) {
+  if (!searchEdit_) return;
+  searchEdit_->setText(keyword);
+  searchEdit_->setFocus(Qt::OtherFocusReason);
+  searchFirstPage();
 }
 
 void MainWindow::applyResultFilters() {

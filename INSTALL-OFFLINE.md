@@ -8,8 +8,8 @@
 
 ```bash
 chmod +x check-target.sh
-./check-target.sh wensousou_1.1.3_arm64.deb
-sudo dpkg -i wensousou_1.1.3_arm64.deb
+./check-target.sh wensousou_1.1.4_arm64.deb
+sudo dpkg -i wensousou_1.1.4_arm64.deb
 wensousou --self-check
 ```
 
@@ -45,6 +45,8 @@ wensousou-diagnose 党费
 从旧版本升级后，首次启动会保留目录配置并自动清除旧文档索引，随后在后台重新建立
 索引。`1.0.9` 在内置 Qt 中启用 DBus，并随应用携带 Fcitx Qt5 输入法插件，用于修复
 UOS Fcitx 4 环境中搜索框无法调起中文输入法的问题。
+
+`1.1.4` 新增搜索历史记录，打开应用后默认聚焦搜索框，并移除主页左上角“文”图标。
 
 `1.1.3` 优化搜索筛选为复选框形式，增加全选、全不选和反选；设置页可限制搜索结果
 保留条数，查询时直接下推到数据库；搜索结果行增加右键菜单，可预览、打开、复制路径
@@ -102,5 +104,5 @@ chmod +x scripts/*.sh parser/build.sh packaging/*.sh
 新安装包生成在：
 
 ```text
-dist/offline-kit/wensousou_1.1.3_arm64.deb
+dist/offline-kit/wensousou_1.1.4_arm64.deb
 ```
