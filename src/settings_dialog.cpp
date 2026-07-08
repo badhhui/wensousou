@@ -12,10 +12,12 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
+#include <QStyle>
 #include <QVBoxLayout>
 
 namespace wensousou {
@@ -209,21 +211,64 @@ void SettingsDialog::resetApplication() {
   };
   if (!settingsPath.isEmpty()) paths.append(settingsPath);
 
-  QMessageBox warning(this);
-  warning.setIcon(QMessageBox::Warning);
+  QDialog warning(this);
   warning.setWindowTitle(QStringLiteral("重置程序数据"));
-  warning.setText(QStringLiteral("程序运行异常时可点击重置程序数据。"));
-  warning.setInformativeText(
+  warning.setWindowFlags(warning.windowFlags() & ~Qt::WindowMaximizeButtonHint);
+  auto* warningLayout = new QVBoxLayout(&warning);
+  warningLayout->setSpacing(12);
+
+  auto* content = new QHBoxLayout;
+  content->setSpacing(12);
+  auto* icon = new QLabel(&warning);
+  icon->setPixmap(style()->standardIcon(QStyle::SP_MessageBoxWarning).pixmap(38, 38));
+  icon->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+  content->addWidget(icon);
+
+  auto* copy = new QVBoxLayout;
+  auto* title = new QLabel(QStringLiteral("程序运行异常时可点击重置程序数据。"), &warning);
+  title->setObjectName(QStringLiteral("resultTitle"));
+  title->setWordWrap(true);
+  auto* message = new QLabel(
       QStringLiteral("此操作将删除索引数据库、索引目录配置、搜索历史和所有本机设置，"
-                     "然后自动重启文搜搜。\n\n原始文档不会被删除。是否继续？"));
-  warning.setDetailedText(
+                     "然后自动重启文搜搜。\n\n原始文档不会被删除。是否继续？"),
+      &warning);
+  message->setWordWrap(true);
+  copy->addWidget(title);
+  copy->addWidget(message);
+  content->addLayout(copy, 1);
+  warningLayout->addLayout(content);
+
+  auto* details = new QPlainTextEdit(&warning);
+  details->setPlainText(
       QStringLiteral("将删除以下文件：\n%1").arg(paths.join(QStringLiteral("\n"))));
-  auto* confirm =
-      warning.addButton(QStringLiteral("确认重置并重启"), QMessageBox::DestructiveRole);
+  details->setReadOnly(true);
+  details->setVisible(false);
+  details->setMinimumHeight(130);
+  warningLayout->addWidget(details);
+
+  auto* buttonRow = new QHBoxLayout;
+  buttonRow->setContentsMargins(0, 0, 0, 0);
+  auto* detailsButton = new QPushButton(QStringLiteral("显示详情"), &warning);
+  detailsButton->setObjectName(QStringLiteral("quietButton"));
+  auto* cancel = new QPushButton(QStringLiteral("取消"), &warning);
+  cancel->setObjectName(QStringLiteral("quietButton"));
+  auto* confirm = new QPushButton(QStringLiteral("确认重置并重启"), &warning);
   confirm->setObjectName(QStringLiteral("dangerButton"));
-  warning.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
-  warning.exec();
-  if (warning.clickedButton() != confirm) return;
+  buttonRow->addWidget(detailsButton);
+  buttonRow->addStretch();
+  buttonRow->addWidget(cancel);
+  buttonRow->addWidget(confirm);
+  warningLayout->addLayout(buttonRow);
+
+  connect(detailsButton, &QPushButton::clicked, &warning, [details, detailsButton, &warning]() {
+    const bool show = !details->isVisible();
+    details->setVisible(show);
+    detailsButton->setText(show ? QStringLiteral("隐藏详情") : QStringLiteral("显示详情"));
+    warning.adjustSize();
+  });
+  connect(cancel, &QPushButton::clicked, &warning, &QDialog::reject);
+  connect(confirm, &QPushButton::clicked, &warning, &QDialog::accept);
+  if (warning.exec() != QDialog::Accepted) return;
 
   QStringList arguments = {
       QStringLiteral("--reset-user-data-helper"),

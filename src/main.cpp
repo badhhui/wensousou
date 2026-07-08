@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
 
   QCoreApplication::setOrganizationName(QStringLiteral("WenSouSou"));
   QCoreApplication::setApplicationName(QStringLiteral("wensousou"));
-  QCoreApplication::setApplicationVersion(QStringLiteral("1.1.4"));
+  QCoreApplication::setApplicationVersion(QStringLiteral("1.1.5"));
   wensousou::initializeLogging();
 
   bool selfCheck = false;
@@ -144,11 +144,11 @@ int main(int argc, char* argv[]) {
   app.setFont(appFont);
   app.setStyleSheet(QStringLiteral(
       "QMainWindow, QDialog, QWidget#appShell { background: #f5f8ff; color: #172033; }"
-      "QLabel#brandTitle { color: #172033; font-size: 26px; font-weight: 700; }"
+      "QLabel#brandTitle { color: #172033; font-weight: 700; }"
       "QLabel#muted, QLabel#resultHint { color: #64748b; }"
-      "QLabel#sectionLabel { color: #64748b; font-size: 14px; font-weight: 700; }"
-      "QLabel#resultTitle { color: #111827; font-size: 21px; font-weight: 700; }"
-      "QLabel#panelTitle { color: #111827; font-size: 24px; font-weight: 700; }"
+      "QLabel#sectionLabel { color: #64748b; font-weight: 700; }"
+      "QLabel#resultTitle { color: #111827; font-weight: 700; }"
+      "QLabel#panelTitle { color: #111827; font-weight: 700; }"
       "QLabel#statusPill { background: rgba(255,255,255,0.72); color: #475569;"
       "  border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 11px; }"
       "QLabel#summaryPill { background: transparent; color: #334155;"
@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
       "  background: #ffffff; border: 1px solid #d9e1ea; border-radius: 7px; }"
       "QLineEdit { padding: 10px 12px; selection-background-color: #bfdbfe; }"
       "QLineEdit#heroSearch { border: 1px solid #60a5fa; border-radius: 8px;"
-      "  padding: 14px 15px; background: #ffffff; font-size: 19px; }"
+      "  padding: 14px 15px; background: #ffffff; }"
       "QLineEdit#heroSearch:focus { border: 2px solid #2563eb; padding: 13px 14px; }"
       "QComboBox { padding: 8px 12px; min-width: 128px; }"
       "QComboBox#filterCombo, QPushButton#filterButton { background: #ffffff;"
@@ -210,6 +210,24 @@ int main(int argc, char* argv[]) {
       "QToolButton:hover { background: #eff6ff; border-color: #93c5fd; }"
       "QToolButton:disabled { color: #94a3b8; background: #f8fafc; border-color: #e2e8f0; }"
       "QCheckBox { color: #334155; spacing: 7px; }"
+      "QScrollBar:vertical { background: #eef4ff; width: 16px; margin: 0;"
+      "  border-radius: 8px; }"
+      "QScrollBar::handle:vertical { background: #60a5fa; min-height: 44px;"
+      "  border-radius: 8px; border: 3px solid #eef4ff; }"
+      "QScrollBar::handle:vertical:hover { background: #2563eb; }"
+      "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0;"
+      "  background: transparent; border: 0; }"
+      "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {"
+      "  background: transparent; }"
+      "QScrollBar:horizontal { background: #eef4ff; height: 16px; margin: 0;"
+      "  border-radius: 8px; }"
+      "QScrollBar::handle:horizontal { background: #60a5fa; min-width: 44px;"
+      "  border-radius: 8px; border: 3px solid #eef4ff; }"
+      "QScrollBar::handle:horizontal:hover { background: #2563eb; }"
+      "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0;"
+      "  background: transparent; border: 0; }"
+      "QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {"
+      "  background: transparent; }"
       "QProgressBar { background: #e2e8f0; border: 0; border-radius: 4px; min-height: 8px; }"
       "QProgressBar::chunk { background: #3b82f6; border-radius: 4px; }"
       "QStatusBar { background: #ffffff; color: #64748b; border-top: 1px solid #e5e7eb; }"));

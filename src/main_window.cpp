@@ -20,6 +20,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHeaderView>
@@ -98,6 +99,18 @@ QString anchoredHighlightedHtml(QString text, const QString& startMarker,
   text.replace(endMarker, QStringLiteral("</span>"));
   if (matchCount) *matchCount = count;
   return text;
+}
+
+void applyWidgetFontRole(QWidget* widget, double factor, bool bold = false) {
+  QFont font = QApplication::font();
+  font.setPointSizeF(font.pointSizeF() * factor);
+  if (bold) font.setBold(true);
+  widget->setFont(font);
+}
+
+int resultTableRowHeight(const QFont& font) {
+  const QFontMetrics metrics(font);
+  return qMax(58, metrics.lineSpacing() * 2 + 28);
 }
 
 }  // namespace
@@ -187,6 +200,7 @@ void MainWindow::setupUi() {
   brandCopy->setSpacing(2);
   auto* brandTitle = new QLabel(QStringLiteral("文搜搜"), this);
   brandTitle->setObjectName(QStringLiteral("brandTitle"));
+  applyWidgetFontRole(brandTitle, 1.75, true);
   auto* brandSubtitle = new QLabel(QStringLiteral("离线文档全文检索工作台"), this);
   brandSubtitle->setObjectName(QStringLiteral("muted"));
   brandCopy->addWidget(brandTitle);
@@ -212,6 +226,7 @@ void MainWindow::setupUi() {
   auto* directoryHeader = new QHBoxLayout;
   auto* searchTitle = new QLabel(QStringLiteral("搜索本机文档"), this);
   searchTitle->setObjectName(QStringLiteral("panelTitle"));
+  applyWidgetFontRole(searchTitle, 1.45, true);
   directoryHeader->addWidget(searchTitle);
   directoryHeader->addStretch();
 
@@ -232,6 +247,7 @@ void MainWindow::setupUi() {
   searchEdit_->setPlaceholderText(QStringLiteral("输入中文关键词进行全文检索"));
   searchEdit_->setClearButtonEnabled(true);
   searchEdit_->setObjectName(QStringLiteral("heroSearch"));
+  applyWidgetFontRole(searchEdit_, 1.15);
   searchButton_ = new QPushButton(QStringLiteral("搜索"), this);
   searchButton_->setObjectName(QStringLiteral("primaryButton"));
   searchButton_->setMinimumHeight(48);
@@ -292,6 +308,7 @@ void MainWindow::setupUi() {
   resultSection->setObjectName(QStringLiteral("sectionLabel"));
   resultTitleLabel_ = new QLabel(QStringLiteral("准备搜索你的文档"), this);
   resultTitleLabel_->setObjectName(QStringLiteral("resultTitle"));
+  applyWidgetFontRole(resultTitleLabel_, 1.30, true);
   resultCopy->addWidget(resultSection);
   resultCopy->addWidget(resultTitleLabel_);
   resultHeader->addLayout(resultCopy);
@@ -312,8 +329,8 @@ void MainWindow::setupUi() {
 
   resultsTable_ = new QTableWidget(0, 5, this);
   resultsTable_->setObjectName(QStringLiteral("resultsTable"));
-  QFont resultFont = resultsTable_->font();
-  resultFont.setPointSize(resultFont.pointSize() + 1);
+  QFont resultFont = QApplication::font();
+  resultFont.setPointSizeF(resultFont.pointSizeF() * 1.08);
   resultsTable_->setFont(resultFont);
   resultsTable_->setHorizontalHeaderLabels(
       {QStringLiteral("文件名"), QStringLiteral("文件大小"), QStringLiteral("命中内容"),
@@ -331,7 +348,10 @@ void MainWindow::setupUi() {
   resultsTable_->setSelectionMode(QAbstractItemView::SingleSelection);
   resultsTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
   resultsTable_->setAlternatingRowColors(true);
-  resultsTable_->verticalHeader()->setDefaultSectionSize(58);
+  resultsTable_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  const int rowHeight = resultTableRowHeight(resultFont);
+  resultsTable_->verticalHeader()->setDefaultSectionSize(rowHeight);
+  resultsTable_->verticalHeader()->setMinimumSectionSize(rowHeight);
   resultsTable_->verticalHeader()->setVisible(false);
   layout->addWidget(resultsTable_, 1);
   auto* paging = new QHBoxLayout;
@@ -396,6 +416,7 @@ void MainWindow::setupUi() {
   resultsTable_->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(resultsTable_, &QTableWidget::customContextMenuRequested,
           this, &MainWindow::showResultContextMenu);
+  applyFontRoles();
   QTimer::singleShot(0, searchEdit_, [this]() {
     if (searchEdit_) searchEdit_->setFocus(Qt::OtherFocusReason);
   });
@@ -440,13 +461,54 @@ void MainWindow::addIndexRoot() {
 
 void MainWindow::showSettings() {
   const int oldResultLimit = configuredSearchResultLimit();
+  const double oldFontScale =
+      qBound(0.85, QSettings().value(QStringLiteral("ui/fontScale"), 1.0).toDouble(), 1.40);
   SettingsDialog dialog(this);
   if (dialog.exec() == QDialog::Accepted) {
+    const double newFontScale =
+        qBound(0.85, QSettings().value(QStringLiteral("ui/fontScale"), 1.0).toDouble(), 1.40);
+    if (!qFuzzyCompare(oldFontScale + 1.0, newFontScale + 1.0)) {
+      QFont appFont = QApplication::font();
+      appFont.setPointSizeF(appFont.pointSizeF() / oldFontScale * newFontScale);
+      QApplication::setFont(appFont);
+      applyFontRoles();
+    }
     rebuildTypeFilterMenu();
     if (oldResultLimit != configuredSearchResultLimit() && !lastSearchQuery_.isEmpty()) {
       searchFirstPage();
     } else {
       applyResultFilters();
+    }
+  }
+}
+
+void MainWindow::applyFontRoles() {
+  for (QLabel* label : findChildren<QLabel*>(QStringLiteral("brandTitle"))) {
+    applyWidgetFontRole(label, 1.75, true);
+  }
+  for (QLabel* label : findChildren<QLabel*>(QStringLiteral("panelTitle"))) {
+    applyWidgetFontRole(label, 1.45, true);
+  }
+  if (resultTitleLabel_) applyWidgetFontRole(resultTitleLabel_, 1.30, true);
+  if (searchEdit_) applyWidgetFontRole(searchEdit_, 1.15);
+  if (!resultsTable_) return;
+
+  QFont resultFont = QApplication::font();
+  resultFont.setPointSizeF(resultFont.pointSizeF() * 1.08);
+  resultsTable_->setFont(resultFont);
+  const int rowHeight = resultTableRowHeight(resultFont);
+  resultsTable_->verticalHeader()->setDefaultSectionSize(rowHeight);
+  resultsTable_->verticalHeader()->setMinimumSectionSize(rowHeight);
+  const int cellMargin = qMax(8, QFontMetrics(resultFont).lineSpacing() / 2);
+  for (int row = 0; row < resultsTable_->rowCount(); ++row) {
+    resultsTable_->setRowHeight(row, rowHeight);
+    for (int column : {0, 2}) {
+      if (QWidget* widget = resultsTable_->cellWidget(row, column)) {
+        widget->setFont(resultFont);
+        if (auto* label = qobject_cast<QLabel*>(widget)) {
+          label->setMargin(cellMargin);
+        }
+      }
     }
   }
 }
@@ -739,8 +801,12 @@ void MainWindow::renderCurrentPage() {
   const int count = qMin(pageSize_, totalCount - first);
   lastResultCount_ = count;
   resultsTable_->setRowCount(count);
+  const QFontMetrics tableMetrics(resultsTable_->font());
+  const int cellMargin = qMax(8, tableMetrics.lineSpacing() / 2);
+  const int rowHeight = resultTableRowHeight(resultsTable_->font());
   for (int row = 0; row < count; ++row) {
     const SearchResult& result = filteredSearchResults_.at(first + row);
+    resultsTable_->setRowHeight(row, rowHeight);
     auto* filename = new QTableWidgetItem;
     filename->setData(Qt::UserRole, result.id);
     filename->setData(Qt::UserRole + 1, result.path);
@@ -755,7 +821,7 @@ void MainWindow::renderCurrentPage() {
                         kResultHighlightStart, kResultHighlightEnd));
     highlightedFilename->setToolTip(result.path);
     highlightedFilename->setFont(resultsTable_->font());
-    highlightedFilename->setMargin(10);
+    highlightedFilename->setMargin(cellMargin);
     highlightedFilename->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     highlightedFilename->setAttribute(Qt::WA_TransparentForMouseEvents);
     resultsTable_->setCellWidget(row, 0, highlightedFilename);
@@ -765,7 +831,7 @@ void MainWindow::renderCurrentPage() {
     snippet->setText(highlightedHtml(result.snippet, kResultHighlightStart,
                                      kResultHighlightEnd));
     snippet->setFont(resultsTable_->font());
-    snippet->setMargin(10);
+    snippet->setMargin(cellMargin);
     snippet->setWordWrap(true);
     snippet->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     snippet->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -853,7 +919,9 @@ void MainWindow::updatePagination() {
     auto* button = new QPushButton(QString::number(index + 1), this);
     button->setObjectName(index == page_ ? QStringLiteral("activePageButton")
                                          : QStringLiteral("quietButton"));
-    button->setFixedWidth(38);
+    const int pageButtonWidth =
+        qMax(38, QFontMetrics(button->font()).horizontalAdvance(QStringLiteral("88")) + 22);
+    button->setMinimumWidth(pageButtonWidth);
     button->setEnabled(index != page_);
     connect(button, &QPushButton::clicked, this, [this, index]() {
       page_ = index;

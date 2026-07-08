@@ -63,6 +63,7 @@ class MainWindow : public QMainWindow {
   void rebuildTypeFilterMenu();
   void setAllTypeFilters(bool checked);
   void invertTypeFilters();
+  void applyFontRoles();
   void refreshSearchHistory();
   void addSearchHistory(const QString& keyword);
   void removeSearchHistory(const QString& keyword);
