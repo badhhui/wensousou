@@ -1,16 +1,18 @@
 #include "settings_dialog.h"
 
+#include "app_paths.h"
 #include "index_worker.h"
 #include "root_policy.h"
 
 #include <QCoreApplication>
-#include <QDialogButtonBox>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QProcess>
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
@@ -20,6 +22,7 @@ namespace wensousou {
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
   setWindowTitle(QStringLiteral("索引设置"));
+  setWindowFlags(windowFlags() & ~Qt::WindowMaximizeButtonHint);
   setMinimumWidth(420);
   const IndexSettings settings = IndexSettings::load();
 
@@ -108,10 +111,24 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
                      "至少需要保留一种文件类型。"),
       this);
   note->setWordWrap(true);
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel,
-                                        this);
-  auto* aboutButton =
-      buttons->addButton(QStringLiteral("关于文搜搜"), QDialogButtonBox::HelpRole);
+
+  auto* resetButton = new QPushButton(QStringLiteral("重置程序数据"), this);
+  resetButton->setObjectName(QStringLiteral("dangerButton"));
+  auto* aboutButton = new QPushButton(QStringLiteral("关于文搜搜"), this);
+  aboutButton->setObjectName(QStringLiteral("quietButton"));
+  auto* cancelButton = new QPushButton(QStringLiteral("取消"), this);
+  cancelButton->setObjectName(QStringLiteral("quietButton"));
+  auto* saveButton = new QPushButton(QStringLiteral("保存"), this);
+  saveButton->setObjectName(QStringLiteral("primaryButton"));
+  saveButton->setDefault(true);
+  auto* buttons = new QHBoxLayout;
+  buttons->setContentsMargins(0, 0, 0, 0);
+  buttons->setSpacing(10);
+  buttons->addWidget(resetButton);
+  buttons->addWidget(aboutButton);
+  buttons->addStretch();
+  buttons->addWidget(cancelButton);
+  buttons->addWidget(saveButton);
   connect(aboutButton, &QPushButton::clicked, this, [this]() {
     QMessageBox about(this);
     about.setWindowTitle(QStringLiteral("关于文搜搜"));
@@ -126,17 +143,27 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
                        "仓库地址：<a href=\"https://github.com/badhhui/wensousou\">"
                        "badhhui/wensousou</a></p>")
             .arg(QCoreApplication::applicationVersion()));
+    about.addButton(QStringLiteral("关闭"), QMessageBox::AcceptRole);
     about.exec();
   });
-  connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::save);
-  connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+  connect(resetButton, &QPushButton::clicked, this, &SettingsDialog::resetApplication);
+  connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
+  connect(saveButton, &QPushButton::clicked, this, &SettingsDialog::save);
+
+  auto* resetHint = new QLabel(
+      QStringLiteral("程序运行异常时可点击“重置程序数据”。重置会清除索引数据库和本机配置，"
+                     "不会删除你的原始文档。"),
+      this);
+  resetHint->setObjectName(QStringLiteral("muted"));
+  resetHint->setWordWrap(true);
 
   auto* layout = new QVBoxLayout(this);
   layout->addLayout(form);
   layout->addWidget(typesLabel);
   layout->addLayout(typesGrid);
   layout->addWidget(note);
-  layout->addWidget(buttons);
+  layout->addWidget(resetHint);
+  layout->addLayout(buttons);
 }
 
 void SettingsDialog::save() {
@@ -147,8 +174,12 @@ void SettingsDialog::save() {
     }
   }
   if (enabledExtensions.isEmpty()) {
-    QMessageBox::warning(this, QStringLiteral("无法保存"),
-                         QStringLiteral("至少需要选择一种建立索引的文件类型。"));
+    QMessageBox message(this);
+    message.setIcon(QMessageBox::Warning);
+    message.setWindowTitle(QStringLiteral("无法保存"));
+    message.setText(QStringLiteral("至少需要选择一种建立索引的文件类型。"));
+    message.addButton(QStringLiteral("确定"), QMessageBox::AcceptRole);
+    message.exec();
     return;
   }
   QSettings settings;
@@ -163,6 +194,63 @@ void SettingsDialog::save() {
   settings.setValue(QStringLiteral("index/updateOnStartup"), startupUpdate_->isChecked());
   settings.setValue(QStringLiteral("index/enabledExtensions"), enabledExtensions);
   accept();
+}
+
+void SettingsDialog::resetApplication() {
+  QSettings settings;
+  settings.sync();
+  const QString databasePath = AppPaths::databasePath();
+  const QString settingsPath = settings.fileName();
+  QStringList paths = {
+      databasePath,
+      databasePath + QStringLiteral("-wal"),
+      databasePath + QStringLiteral("-shm"),
+      databasePath + QStringLiteral("-journal"),
+  };
+  if (!settingsPath.isEmpty()) paths.append(settingsPath);
+
+  QMessageBox warning(this);
+  warning.setIcon(QMessageBox::Warning);
+  warning.setWindowTitle(QStringLiteral("重置程序数据"));
+  warning.setText(QStringLiteral("程序运行异常时可点击重置程序数据。"));
+  warning.setInformativeText(
+      QStringLiteral("此操作将删除索引数据库、索引目录配置、搜索历史和所有本机设置，"
+                     "然后自动重启文搜搜。\n\n原始文档不会被删除。是否继续？"));
+  warning.setDetailedText(
+      QStringLiteral("将删除以下文件：\n%1").arg(paths.join(QStringLiteral("\n"))));
+  auto* confirm =
+      warning.addButton(QStringLiteral("确认重置并重启"), QMessageBox::DestructiveRole);
+  confirm->setObjectName(QStringLiteral("dangerButton"));
+  warning.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+  warning.exec();
+  if (warning.clickedButton() != confirm) return;
+
+  QStringList arguments = {
+      QStringLiteral("--reset-user-data-helper"),
+      QString::number(QCoreApplication::applicationPid()),
+      QStringLiteral("--restart"),
+      QCoreApplication::applicationFilePath(),
+  };
+  for (const QString& path : paths) {
+    if (path.isEmpty()) continue;
+    arguments << QStringLiteral("--path") << path;
+  }
+
+  if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), arguments)) {
+    QMessageBox message(this);
+    message.setIcon(QMessageBox::Warning);
+    message.setWindowTitle(QStringLiteral("重置失败"));
+    message.setText(QStringLiteral("无法启动重置助手。"));
+    message.setInformativeText(
+        QStringLiteral("请关闭文搜搜后手动删除：\n%1")
+            .arg(paths.join(QStringLiteral("\n"))));
+    message.addButton(QStringLiteral("确定"), QMessageBox::AcceptRole);
+    message.exec();
+    return;
+  }
+
+  accept();
+  QCoreApplication::quit();
 }
 
 }  // namespace wensousou

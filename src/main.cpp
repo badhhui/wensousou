@@ -5,13 +5,18 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QFont>
+#include <QProcess>
 #include <QRect>
 #include <QScreen>
 #include <QSize>
 #include <QSettings>
 #include <QTextCodec>
 #include <QTextStream>
+#include <QThread>
 #include <QTimer>
 
 #include <clocale>
@@ -26,6 +31,61 @@ QSize defaultWindowSize(const QRect& availableGeometry) {
   const int height = qMin(availableHeight,
                           qMin(1000, qMax(680, int(availableGeometry.height() * 0.86))));
   return QSize(width, height);
+}
+
+void waitForProcessExit(qint64 pid) {
+  if (pid <= 0) return;
+  const QString procPath = QStringLiteral("/proc/%1").arg(pid);
+  for (int attempt = 0; attempt < 600; ++attempt) {
+    if (!QFileInfo::exists(procPath)) return;
+    QThread::msleep(100);
+  }
+}
+
+bool removePath(const QString& path) {
+  if (path.isEmpty()) return true;
+  const QFileInfo info(path);
+  if (!info.exists() && !info.isSymLink()) return true;
+  if (info.isDir() && !info.isSymLink()) {
+    QDir directory(path);
+    return directory.removeRecursively();
+  }
+  return QFile::remove(path);
+}
+
+int runResetUserDataHelper(int argc, char* argv[]) {
+  QCoreApplication app(argc, argv);
+  const QStringList arguments = app.arguments();
+  qint64 parentPid = 0;
+  QString restartPath;
+  QStringList paths;
+
+  for (int index = 1; index < arguments.size(); ++index) {
+    const QString argument = arguments.at(index);
+    if (argument == QStringLiteral("--reset-user-data-helper") &&
+        index + 1 < arguments.size()) {
+      parentPid = arguments.at(++index).toLongLong();
+    } else if (argument == QStringLiteral("--restart") &&
+               index + 1 < arguments.size()) {
+      restartPath = arguments.at(++index);
+    } else if (argument == QStringLiteral("--path") &&
+               index + 1 < arguments.size()) {
+      paths.append(arguments.at(++index));
+    }
+  }
+
+  waitForProcessExit(parentPid);
+  for (const QString& path : paths) {
+    if (!removePath(path)) {
+      qWarning("Failed to remove reset target: %s", qPrintable(path));
+    }
+  }
+
+  if (!restartPath.isEmpty()) {
+    QProcess::startDetached(restartPath, QStringList(),
+                            QFileInfo(restartPath).absolutePath());
+  }
+  return 0;
 }
 
 }  // namespace
@@ -43,6 +103,7 @@ int main(int argc, char* argv[]) {
 
   bool selfCheck = false;
   bool diagnoseIndex = false;
+  bool resetHelper = false;
   QString diagnoseQuery;
   for (int index = 1; index < argc; ++index) {
     const QString argument = QString::fromLocal8Bit(argv[index]);
@@ -51,7 +112,12 @@ int main(int argc, char* argv[]) {
     } else if (argument == QStringLiteral("--diagnose-index")) {
       diagnoseIndex = true;
       if (index + 1 < argc) diagnoseQuery = QString::fromLocal8Bit(argv[++index]);
+    } else if (argument == QStringLiteral("--reset-user-data-helper")) {
+      resetHelper = true;
     }
+  }
+  if (resetHelper) {
+    return runResetUserDataHelper(argc, argv);
   }
   if (selfCheck) {
     QCoreApplication app(argc, argv);

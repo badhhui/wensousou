@@ -17,6 +17,7 @@ class SettingsDialog : public QDialog {
 
  private slots:
   void save();
+  void resetApplication();
 
  private:
   QSpinBox* maxFileMb_ = nullptr;
